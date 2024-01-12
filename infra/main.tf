@@ -47,9 +47,14 @@ resource "google_compute_instance_template" "builder_template" {
       #!/bin/bash
 
       apt-get update
-      apt-get install -y curl
+      apt-get install -y curl build-essential
 
       curl -o- https://get.docker.com/ | bash -
+
+      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+      /root/.cargo/bin/cargo install minijinja-cli
+      cp /root/.cargo/bin/minijinja-cli /usr/bin/minijinja-cli
+      chmod 777 /usr/bin/minijinja-cli
 
       curl -fsSL https://keys.openpgp.org/vks/v1/by-fingerprint/32A37959C2FA5C3C99EFBC32A79206696452D198 | sudo gpg --dearmor -o /usr/share/keyrings/buildkite-agent-archive-keyring.gpg
       echo "deb [signed-by=/usr/share/keyrings/buildkite-agent-archive-keyring.gpg] https://apt.buildkite.com/buildkite-agent stable main" | sudo tee /etc/apt/sources.list.d/buildkite-agent.list
@@ -93,7 +98,7 @@ resource "google_compute_region_instance_group_manager" "builder_group" {
     instance_template  = google_compute_instance_template.builder_template.self_link_unique
   }
 
-  target_size        = 0
+  target_size        = 1
 }
 
 resource "google_artifact_registry_repository" "my-repo" {
@@ -109,6 +114,100 @@ resource "google_artifact_registry_repository" "my-repo" {
     action = "DELETE"
     condition {
       older_than   = "604800s" // 7 days
+    }
+  }
+}
+
+# K8s cluster for testing
+resource "google_container_cluster" "test_cluster" {
+  name           = "vllm-ci-test-cluster"
+  location       = "us-central1"
+  node_locations = ["us-central1-a", "us-central1-b", "us-central1-c"]
+  network        = "default"
+
+  # We can't create a cluster with no node pool defined, but we want to only use
+  # separately managed node pools. So we create the smallest possible default
+  # node pool and immediately delete it.
+  remove_default_node_pool = true
+  initial_node_count       = 1
+  deletion_protection      = false
+}
+
+variable "node_pools" {
+  description = "Configuration for each node pool"
+  type = map(object({
+    name_suffix           = string
+    total_max_node_count  = number
+    guest_accelerator_count = number
+    machine_type          = string
+  }))
+  default = {
+    gpu_pool = {
+      name_suffix           = ""
+      total_max_node_count  = 10
+      guest_accelerator_count = 1
+      machine_type          = "g2-standard-12"
+    },
+    gpu_L4x2_pool = {
+      name_suffix           = "-l4-2"
+      total_max_node_count  = 4
+      guest_accelerator_count = 2
+      machine_type          = "g2-standard-24"
+    }
+  }
+}
+
+resource "google_container_node_pool" "node_pool" {
+  for_each   = var.node_pools
+
+  name       = "${google_container_cluster.test_cluster.name}${each.value.name_suffix}"
+  location   = "us-central1"
+  cluster    = google_container_cluster.test_cluster.name
+  node_count = 0
+
+  autoscaling {
+    total_min_node_count = "0"
+    total_max_node_count = tostring(each.value.total_max_node_count)
+    location_policy      = "ANY"
+  }
+
+  management {
+    auto_repair  = "true"
+    auto_upgrade = "true"
+  }
+
+  node_config {
+    oauth_scopes = [
+      "https://www.googleapis.com/auth/logging.write",
+      "https://www.googleapis.com/auth/monitoring",
+      "https://www.googleapis.com/auth/devstorage.read_only",
+      "https://www.googleapis.com/auth/trace.append",
+      "https://www.googleapis.com/auth/service.management.readonly",
+      "https://www.googleapis.com/auth/servicecontrol",
+    ]
+
+    labels = {
+      env = var.project_id
+    }
+
+    guest_accelerator {
+      type  = "nvidia-l4"
+      count = each.value.guest_accelerator_count
+      gpu_driver_installation_config {
+        gpu_driver_version = "LATEST"
+      }
+    }
+
+    machine_type = each.value.machine_type
+    image_type   = "cos_containerd"
+    preemptible  = true
+    tags         = ["gke-node", "${var.project_id}-gke"]
+
+    disk_size_gb = "512"
+    disk_type    = "pd-balanced"
+
+    metadata = {
+      disable-legacy-endpoints = "true"
     }
   }
 }

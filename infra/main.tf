@@ -35,7 +35,7 @@ resource "google_project_iam_member" "artifact_registry_iam" {
 
 resource "google_compute_instance_template" "builder_template" {
   name        = "builder-template"
-  machine_type = "e2-standard-16"  # 16 vCPUs, 64 GB RAM
+  machine_type = "m3-ultramem-32"  # 32 vCPUs, 976 GB RAM
 
   scheduling {
     preemptible       = true
@@ -93,6 +93,7 @@ resource "google_compute_region_instance_group_manager" "builder_group" {
   name               = "builder-group"
   base_instance_name = "builder-instance"
   region = "us-central1"
+  distribution_policy_zones  = ["us-central1-a", "us-central1-b"]
 
   version {
     instance_template  = google_compute_instance_template.builder_template.self_link_unique

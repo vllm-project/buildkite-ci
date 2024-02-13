@@ -145,13 +145,13 @@ variable "node_pools" {
   default = {
     gpu_pool = {
       name_suffix           = ""
-      total_max_node_count  = 10
+      total_max_node_count  = 20
       guest_accelerator_count = 1
       machine_type          = "g2-standard-12"
     },
     gpu_L4x2_pool = {
       name_suffix           = "-l4-2"
-      total_max_node_count  = 4
+      total_max_node_count  = 8
       guest_accelerator_count = 2
       machine_type          = "g2-standard-24"
     }
@@ -164,7 +164,7 @@ resource "google_container_node_pool" "node_pool" {
   name       = "${google_container_cluster.test_cluster.name}${each.value.name_suffix}"
   location   = "us-central1"
   cluster    = google_container_cluster.test_cluster.name
-  node_count = 0
+  # node_count = 0
 
   autoscaling {
     total_min_node_count = "0"

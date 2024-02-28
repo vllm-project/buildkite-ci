@@ -1,0 +1,24 @@
+sources:
+  in:
+    type: http_server
+    address: ${HOST}:${PORT}
+
+transforms:
+  modify:
+    type: remap
+    inputs:
+      - in
+    source: |
+      . = parse_json!(string!(.message))
+
+sinks:
+  out:
+    inputs:
+      - modify
+    type: gcp_cloud_storage
+    bucket: vllm-usage-stats
+    encoding:
+      codec: json
+    framing:
+      method: newline_delimited
+    key_prefix: year=%Y/

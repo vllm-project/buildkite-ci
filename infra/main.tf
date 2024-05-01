@@ -33,6 +33,13 @@ resource "google_project_iam_member" "artifact_registry_iam" {
   member  = "serviceAccount:${google_service_account.artifact_registry_sa.email}"
 }
 
+# also make the service account a Storage Admin for bucket named
+resource "google_storage_bucket_iam_member" "artifact_registry_bucket_iam" {
+  bucket = "vllm-build-artifacts"
+  role   = "roles/storage.admin"
+  member = "serviceAccount:${google_service_account.artifact_registry_sa.email}"
+}
+
 resource "google_compute_instance_template" "builder_template" {
   name        = "builder-template"
   machine_type = "m3-ultramem-32"  # 32 vCPUs, 976 GB RAM
@@ -99,7 +106,7 @@ resource "google_compute_region_instance_group_manager" "builder_group" {
     instance_template  = google_compute_instance_template.builder_template.self_link_unique
   }
 
-  target_size        = 1
+  target_size        = 2
 }
 
 resource "google_artifact_registry_repository" "my-repo" {
@@ -145,7 +152,7 @@ variable "node_pools" {
   default = {
     gpu_pool = {
       name_suffix           = ""
-      total_max_node_count  = 20
+      total_max_node_count  = 60
       guest_accelerator_count = 1
       machine_type          = "g2-standard-12"
     },
@@ -154,6 +161,12 @@ variable "node_pools" {
       total_max_node_count  = 8
       guest_accelerator_count = 2
       machine_type          = "g2-standard-24"
+    },
+    gpu_L4x4_pool = {
+      name_suffix           = "-l4-4"
+      total_max_node_count  = 1
+      guest_accelerator_count = 4
+      machine_type          = "g2-standard-48"
     }
   }
 }
@@ -163,11 +176,12 @@ resource "google_container_node_pool" "node_pool" {
 
   name       = "${google_container_cluster.test_cluster.name}${each.value.name_suffix}"
   location   = "us-central1"
+  node_locations = ["us-central1-a", "us-central1-b"]
   cluster    = google_container_cluster.test_cluster.name
-  # node_count = 0
+  node_count = 1
 
   autoscaling {
-    total_min_node_count = "0"
+    total_min_node_count = "1"
     total_max_node_count = tostring(each.value.total_max_node_count)
     location_policy      = "ANY"
   }
@@ -201,7 +215,7 @@ resource "google_container_node_pool" "node_pool" {
 
     machine_type = each.value.machine_type
     image_type   = "cos_containerd"
-    preemptible  = true
+    # preemptible  = true
     tags         = ["gke-node", "${var.project_id}-gke"]
 
     disk_size_gb = "512"

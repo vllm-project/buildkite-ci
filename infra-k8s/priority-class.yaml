@@ -4,7 +4,7 @@ kind: PriorityClass
 metadata:
   name: gpu-priority-cls-8
 value: 2008
-preemptionPolicy: Never
+preemptionPolicy: PreemptLowerPriority
 globalDefault: false
 description: "This priority class will be used for 8 GPU pods."
 ---
@@ -13,7 +13,7 @@ kind: PriorityClass
 metadata:
   name: gpu-priority-cls-4
 value: 2004
-preemptionPolicy: Never
+preemptionPolicy: PreemptLowerPriority
 globalDefault: false
 description: "This priority class will be used for 4 GPU pods."
 ---
@@ -22,7 +22,7 @@ kind: PriorityClass
 metadata:
   name: gpu-priority-cls-2
 value: 2002
-preemptionPolicy: Never
+preemptionPolicy: PreemptLowerPriority
 globalDefault: false
 description: "This priority class will be used for 2 GPU pods."
 ---
@@ -31,7 +31,7 @@ kind: PriorityClass
 metadata:
   name: gpu-priority-cls-1
 value: 2001
-preemptionPolicy: Never
+preemptionPolicy: PreemptLowerPriority
 globalDefault: false
 description: "This priority class will be used for 1 GPU pods."
 

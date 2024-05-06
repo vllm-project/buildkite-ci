@@ -145,28 +145,36 @@ variable "node_pools" {
   description = "Configuration for each node pool"
   type = map(object({
     name_suffix           = string
+    total_min_node_count = number
     total_max_node_count  = number
     guest_accelerator_count = number
     machine_type          = string
+    preemptible = bool
   }))
   default = {
     gpu_pool = {
       name_suffix           = ""
+      total_min_node_count = 1
       total_max_node_count  = 60
       guest_accelerator_count = 1
       machine_type          = "g2-standard-12"
+      preemptible = true
     },
     gpu_L4x2_pool = {
       name_suffix           = "-l4-2"
-      total_max_node_count  = 8
+      total_min_node_count = 0
+      total_max_node_count  = 2
       guest_accelerator_count = 2
       machine_type          = "g2-standard-24"
+      preemptible = true
     },
     gpu_L4x4_pool = {
       name_suffix           = "-l4-4"
+      total_min_node_count = 0
       total_max_node_count  = 1
       guest_accelerator_count = 4
       machine_type          = "g2-standard-48"
+      preemptible = false
     }
   }
 }
@@ -178,10 +186,10 @@ resource "google_container_node_pool" "node_pool" {
   location   = "us-central1"
   node_locations = ["us-central1-a", "us-central1-b"]
   cluster    = google_container_cluster.test_cluster.name
-  node_count = 1
+  node_count = each.value.total_min_node_count
 
   autoscaling {
-    total_min_node_count = "1"
+    total_min_node_count = tostring(each.value.total_min_node_count)
     total_max_node_count = tostring(each.value.total_max_node_count)
     location_policy      = "ANY"
   }
@@ -215,7 +223,7 @@ resource "google_container_node_pool" "node_pool" {
 
     machine_type = each.value.machine_type
     image_type   = "cos_containerd"
-    # preemptible  = true
+    preemptible  = each.value.preemptible
     tags         = ["gke-node", "${var.project_id}-gke"]
 
     disk_size_gb = "512"

@@ -63,17 +63,17 @@ locals {
       ECRAccessPolicy         = "readonly"
       InstanceOperatingSystem = "linux"
       OnDemandPercentage      = 100
-      ImageId                 = "ami-060f16e7ab30bfef6"
+      ImageId                 = "ami-0b551235ed4442551"
     },
 
     gpu-4-queue = {
       BuildkiteQueue          = "gpu_4_queue"
       InstanceTypes           = "g6.12xlarge"
-      MaxSize                 = 2
+      MaxSize                 = 3
       ECRAccessPolicy         = "readonly"
       InstanceOperatingSystem = "linux"
       OnDemandPercentage      = 100
-      ImageId                 = "ami-060f16e7ab30bfef6"
+      ImageId                 = "ami-0b551235ed4442551"
     }
   }
 

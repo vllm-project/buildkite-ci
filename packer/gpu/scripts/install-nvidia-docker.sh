@@ -1,8 +1,9 @@
 #!/bin/bash
 set -eu -o pipefail
 
+# This script is running as ec2-user so need to sudo
 # Install Nvidia driver
-sudo yum install -y kernel-devel-$(uname -r) kernel-headers-$(uname -r) dkms # Running as ec2-user so need to sudo
+sudo yum install -y kernel-devel-$(uname -r) kernel-headers-$(uname -r) dkms 
 
 sudo yum install -y pkgconfig libglvnd-devel
 

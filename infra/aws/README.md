@@ -16,9 +16,21 @@ You need to add the 2 following credentials:
 - vLLM AWS access key ID & secret access key 
 - Buildkite API token (with access to vLLM org and with GraphQL API Access enabled) `export BUILDKITE_API_TOKEN=....`
 
-To set up, start with initalizing:
+To set up, start with loading the remote state:
 ```bash
+cd remote-state
 terraform init
+terraform apply
+```
+
+Pass the output of applying remote state to `backend.hcl` so we can work on top of it:
+```bash
+terraform output > ../backend.hcl
+```
+
+Now, start with initializing using the remote state we just set up:
+```bash
+terraform init -backend_config=./backend.hcl
 ```
 
 then validate with:
@@ -37,3 +49,5 @@ terraform apply
 ```
 
 Confirm the changes are made on AWS and monitor changes in the new builds on Buildkite.
+
+The current state (`terraform.tfstate`) after applying will be updated in the remote data store (S3 bucket)

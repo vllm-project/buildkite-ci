@@ -153,7 +153,7 @@ resource "aws_iam_policy" "bk_stack_secrets_access" {
       Action = ["secretsmanager:GetSecretValue"],
       Effect : "Allow",
       Resource = [
-        "arn:aws:secretsmanager:us-west-2:936637512419:secret:hf_token-JD4TSm"
+        aws_secretsmanager_secret.ci_hf_token.arn
       ]
     }]
   })

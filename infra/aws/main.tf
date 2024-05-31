@@ -16,7 +16,7 @@ module "vpc" {
   cidr = "10.0.0.0/16"
 
   azs            = ["us-west-2a", "us-west-2b", "us-west-2c", "us-west-2d"]
-  public_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24", "10.0.4.0/24"]
+  public_subnets = ["10.0.0.0/18", "10.0.64.0/18", "10.0.128.0/18", "10.0.192.0/18"]
 
   enable_dns_hostnames          = true
   map_public_ip_on_launch       = true
@@ -46,9 +46,18 @@ locals {
   }
 
   queues_parameters = {
+    small-cpu-queue = {
+      BuildkiteQueue          = "small_cpu_queue"
+      InstanceTypes           = "r6in.large" # r6in uses Intel Ice Lake which supports AVX-512 required by vLLM CPU backend.
+      MaxSize                 = 2
+      ECRAccessPolicy         = "poweruser"
+      InstanceOperatingSystem = "linux"
+      OnDemandPercentage      = 100
+      EnableInstanceStorage   = "true"
+    }
     cpu-queue = {
       BuildkiteQueue          = "cpu_queue"
-      InstanceTypes           = "r6in.16xlarge"
+      InstanceTypes           = "r6in.16xlarge" # r6in uses Intel Ice Lake which supports AVX-512 required by vLLM CPU backend. 16x large comes with 512GB memory, required for compiling CUDA kernel.
       MaxSize                 = 2
       ECRAccessPolicy         = "poweruser"
       InstanceOperatingSystem = "linux"
@@ -57,23 +66,23 @@ locals {
     },
 
     gpu-1-queue = {
-      BuildkiteQueue          = "gpu_1_queue"
-      InstanceTypes           = "g6.4xlarge"
+      BuildkiteQueue          = "gpu_1_queue" # Queue for jobs running on 1 GPU
+      InstanceTypes           = "g6.4xlarge"  # 1 Nvidia L4 GPU and 64GB memory.
       MaxSize                 = 60
       ECRAccessPolicy         = "readonly"
       InstanceOperatingSystem = "linux"
       OnDemandPercentage      = 100
-      ImageId                 = "ami-0b551235ed4442551"
+      ImageId                 = "ami-03d9992ee575904da" # Custom AMI based on Buildkite Linux AMI with CUDA 12.0
     },
 
     gpu-4-queue = {
-      BuildkiteQueue          = "gpu_4_queue"
-      InstanceTypes           = "g6.12xlarge"
-      MaxSize                 = 3
+      BuildkiteQueue          = "gpu_4_queue" # Queue for jobs running on 4 GPUs
+      InstanceTypes           = "g6.12xlarge" # 4 Nvidia L4 GPUs and 192GB memory.
+      MaxSize                 = 4
       ECRAccessPolicy         = "readonly"
       InstanceOperatingSystem = "linux"
       OnDemandPercentage      = 100
-      ImageId                 = "ami-0b551235ed4442551"
+      ImageId                 = "ami-03d9992ee575904da" # Custom AMI based on Buildkite Linux AMI with CUDA 12.0
     }
   }
 

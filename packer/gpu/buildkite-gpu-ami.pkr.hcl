@@ -9,7 +9,7 @@ source "amazon-ebs" "gpu_box" {
   ami_name        = "buildkite-stack-linux-gpu-${local.timestamp}"
   ami_description = "Buildkite Elastic Stack (Amazon Linux 2 LTS w/ nvidia-docker)"
   ami_groups      = ["all"]
-  instance_type   = "g6.2xlarge"
+  instance_type   = "g6.4xlarge"
   launch_block_device_mappings {
     delete_on_termination = true
     device_name           = "/dev/xvda"

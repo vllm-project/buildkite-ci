@@ -1,8 +1,8 @@
 #!/bin/bash
 set -eu -o pipefail
 
-# nvidia driver
-sudo yum install -y kernel-devel-$(uname -r) kernel-headers-$(uname -r) dkms
+# Install Nvidia driver
+sudo yum install -y kernel-devel-$(uname -r) kernel-headers-$(uname -r) dkms # Running as ec2-user so need to sudo
 
 sudo yum install -y pkgconfig libglvnd-devel
 
@@ -10,7 +10,7 @@ readonly NVIDIA_DRIVER_VERSION="525.147.05" # Driver version for CUDA 12.0, Linu
 # vLLM is using CUDA 12.1, so 12.0 is the closest version with a L4 driver available
 NVIDIA_DRIVER="https://us.download.nvidia.com/tesla/${NVIDIA_DRIVER_VERSION}/NVIDIA-Linux-x86_64-${NVIDIA_DRIVER_VERSION}.run"
 
-curl -Lsf -o cuda_toolkit.run "${NVIDIA_DRIVER}" # Load runfile into cuda_toolkit.run
+curl -sfL -o cuda_toolkit.run "${NVIDIA_DRIVER}" # Load runfile into cuda_toolkit.run
 sudo dnf install -y kernel-modules-extra # https://github.com/amazonlinux/amazon-linux-2023/issues/538
 sudo sh cuda_toolkit.run --silent --dkms # Install the driver
 rm cuda_toolkit.run

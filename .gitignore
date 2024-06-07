@@ -2,7 +2,7 @@
 **/.terraform/*
 
 # .tfstate files
-*.tfstate
+*/infra/aws/remote-state/*.tfstate
 *.tfstate.*
 
 # Crash log files

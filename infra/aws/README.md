@@ -30,7 +30,7 @@ terraform output > ../backend.hcl
 
 Now, start with initializing using the remote state we just set up:
 ```bash
-terraform init -backend_config=./backend.hcl
+terraform init -backend-config=./backend.hcl
 ```
 
 then validate with:

@@ -159,6 +159,26 @@ resource "aws_iam_policy" "bk_stack_secrets_access" {
   })
 }
 
+resource "aws_iam_policy" "bk_stack_sccache_bucket_access" {
+  name = "access-to-sccache-bucket"
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Action = [
+        "s3:Get*",
+        "s3:List",
+        "s3:PutObject"
+      ],
+      Effect : "Allow",
+      Resource = [
+        "arn:aws:s3:::vllm-build-sccache/*",
+        "arn:aws:s3:::vllm-build-sccache"
+      ]
+    }]
+  })
+}
+
 resource "aws_iam_role_policy_attachment" "ecr_public_access" {
   for_each   = aws_cloudformation_stack.bk_queue
   role       = each.value.outputs.InstanceRoleName
@@ -169,4 +189,16 @@ resource "aws_iam_role_policy_attachment" "bk_stack_secrets_access" {
   for_each   = aws_cloudformation_stack.bk_queue
   role       = each.value.outputs.InstanceRoleName
   policy_arn = aws_iam_policy.bk_stack_secrets_access.arn
+}
+
+locals {
+
+}
+resource "aws_iam_role_policy_attachment" "bk_stack_sccache_bucket_access" {
+  for_each   = {
+    for k, v in aws_cloudformation_stack.bk_queue : k => v
+    if v.name == "bk-cpu-queue"
+  }
+  role       = each.value.outputs.InstanceRoleName
+  policy_arn = aws_iam_policy.bk_stack_sccache_bucket_access.arn
 }

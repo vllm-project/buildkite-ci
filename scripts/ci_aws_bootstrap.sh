@@ -40,18 +40,18 @@ if [[ TRIGGER -eq 1 ]]; then
     done
 fi
 
-if [[ TRIGGER -eq 1 ]]; then
+if [[ TRIGGER -ne 1 ]]; then
     echo "No relevant changes found to trigger tests."
     exit 0
 fi
 
-exit 0
+if [[ TRIGGER -eq 1 ]]; then
+    echo "Uploading pipeline..."
 
-echo "Uploading pipeline..."
-
-ls .buildkite || buildkite-agent annotate --style error 'Please merge upstream main branch for buildkite CI'
-curl -sSfL https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-installer.sh | sh
-source /var/lib/buildkite-agent/.cargo/env
-cd .buildkite && minijinja-cli test-template-aws.j2 test-pipeline.yaml > pipeline.yml
-cat pipeline.yml
-buildkite-agent pipeline upload pipeline.yml
+    ls .buildkite || buildkite-agent annotate --style error 'Please merge upstream main branch for buildkite CI'
+    curl -sSfL https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-installer.sh | sh
+    source /var/lib/buildkite-agent/.cargo/env
+    cd .buildkite && minijinja-cli test-template-aws.j2 test-pipeline.yaml > pipeline.yml
+    cat pipeline.yml
+    buildkite-agent pipeline upload pipeline.yml
+fi

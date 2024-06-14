@@ -13,7 +13,7 @@ get_diff() {
     echo $(git diff --name-only --diff-filter=ACM $(git merge-base origin/main HEAD))
 }
 
-if [[ TRIGGER -ne 1 ]]; then
+if [[ $TRIGGER -ne 1 ]]; then
     diff=$(get_diff)
 
     patterns=(
@@ -41,12 +41,12 @@ if [[ TRIGGER -ne 1 ]]; then
     done
 fi
 
-if [[ TRIGGER -ne 1 ]]; then
+if [[ $TRIGGER -ne 1 ]]; then
     echo "No relevant changes found to trigger tests."
     exit 0
 fi
 
-if [[ TRIGGER -eq 1 ]]; then
+if [[ $TRIGGER -eq 1 ]]; then
     echo "Uploading pipeline..."
 
     ls .buildkite || buildkite-agent annotate --style error 'Please merge upstream main branch for buildkite CI'

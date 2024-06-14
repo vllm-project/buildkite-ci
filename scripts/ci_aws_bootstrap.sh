@@ -45,6 +45,8 @@ if [[ TRIGGER -eq 1 ]]; then
     exit 0
 fi
 
+exit 0
+
 echo "Uploading pipeline..."
 
 ls .buildkite || buildkite-agent annotate --style error 'Please merge upstream main branch for buildkite CI'

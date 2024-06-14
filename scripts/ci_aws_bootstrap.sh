@@ -34,6 +34,7 @@ if [[ TRIGGER -ne 1 ]]; then
         for pattern in "${patterns[@]}"; do
             if [[ $file == $pattern* ]] || [[ $file == $pattern ]]; then
                 TRIGGER=1
+                echo "Found relevant changes: $file"
                 break
             fi
         done

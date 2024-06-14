@@ -13,7 +13,7 @@ get_diff() {
     echo $(git diff --name-only --diff-filter=ACM $(git merge-base origin/main HEAD))
 }
 
-if [[ TRIGGER -eq 1 ]]; then
+if [[ TRIGGER -ne 1 ]]; then
     diff=$(get_diff)
 
     patterns=(

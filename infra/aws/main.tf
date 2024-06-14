@@ -49,7 +49,7 @@ locals {
     small-cpu-queue = {
       BuildkiteQueue          = "small_cpu_queue"
       InstanceTypes           = "r6in.large" # r6in uses Intel Ice Lake which supports AVX-512 required by vLLM CPU backend.
-      MaxSize                 = 1
+      MaxSize                 = 5
       ECRAccessPolicy         = "poweruser"
       InstanceOperatingSystem = "linux"
       OnDemandPercentage      = 100

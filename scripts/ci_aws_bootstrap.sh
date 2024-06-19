@@ -14,7 +14,8 @@ upload_pipeline() {
 }
 
 get_diff() {
-    echo $(git diff --name-only --diff-filter=ACM $(git merge-base origin/main HEAD))
+    $(git add .)
+    echo $(git diff --name-only --diff-filter=ACMR $(git merge-base origin/main HEAD))
 }
 
 if [[ "${BUILDKITE_BRANCH}" == "main" ]]; then

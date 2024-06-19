@@ -15,7 +15,7 @@ upload_pipeline() {
 
 get_diff() {
     $(git add .)
-    echo $(git diff --name-status --diff-filter=ACMR $(git merge-base origin/main HEAD))
+    echo $(git diff --name-status --diff-filter=ACMDR $(git merge-base origin/main HEAD))
 }
 
 if [[ "${BUILDKITE_BRANCH}" == "main" ]]; then

@@ -18,7 +18,7 @@ get_diff() {
     echo $(git diff --name-status --diff-filter=ACMDR $(git merge-base origin/main HEAD))
 }
 
-if [[ "${RUN_ALL}" == "1" ]]; then
+if [[ "${RUN_ALL:-}" == "1" ]]; then
     upload_pipeline
 fi
 

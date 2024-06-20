@@ -18,6 +18,10 @@ get_diff() {
     echo $(git diff --name-status --diff-filter=ACMDR $(git merge-base origin/main HEAD))
 }
 
+if [[ "${RUN_ALL}" == "1" ]]; then
+    upload_pipeline
+fi
+
 if [[ "${BUILDKITE_BRANCH}" == "main" ]]; then
     echo "Run full tests on main"
     upload_pipeline

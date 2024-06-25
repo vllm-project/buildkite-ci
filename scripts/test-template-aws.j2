@@ -1,5 +1,6 @@
 {% set docker_image = "public.ecr.aws/q9t5s3a7/vllm-ci-test-repo:$BUILDKITE_COMMIT" %}
 {% set default_working_dir = "/vllm-workspace/tests" %}
+{% set hf_home = "/home/.cache/huggingface" %}
 
 steps:
   - label: ":docker: build image"
@@ -85,9 +86,13 @@ steps:
             volumeMounts:
             - name: devshm
               mountPath: /dev/shm
+            - name: hf-cache
+              mountPath: {{ hf_home }}
             env:
             - name: VLLM_USAGE_SOURCE
               value: ci-test
+            - name: HF_HOME
+              value: {{ hf_home }}
             - name: HF_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -99,6 +104,8 @@ steps:
           - name: devshm
             emptyDir:
               medium: Memory
+          - name: hf-cache
+            emptyDir: {}
   {% else %}
   - label: "{{ step.label }}"
     agents:
@@ -135,11 +142,13 @@ steps:
           command: ["bash", "-c", "cd {{ (step.working_dir or default_working_dir) | safe  }} && {{ step.command  or (step.commands | join(' && ')) | safe }}"]
           environment:
             - VLLM_USAGE_SOURCE=ci-test
+            - HF_HOME={{ hf_home }}
             - HF_TOKEN
             {% if step.label == "Speculative decoding tests" %}
             - VLLM_ATTENTION_BACKEND=XFORMERS
             {% endif %}
           volumes:
             - /dev/shm:/dev/shm
+            - {{ hf_home }}:{{ hf_home }}
   {% endif %}
   {% endfor %}

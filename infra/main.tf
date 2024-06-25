@@ -160,6 +160,14 @@ variable "node_pools" {
       machine_type          = "g2-standard-12"
       preemptible = true
     },
+    gpu_pool_reserved_pool = {
+      name_suffix           = "-on-demand"
+      total_min_node_count = 2
+      total_max_node_count  = 20
+      guest_accelerator_count = 1
+      machine_type          = "g2-standard-12"
+      preemptible = false
+    },
     gpu_L4x2_pool = {
       name_suffix           = "-l4-2"
       total_min_node_count = 0

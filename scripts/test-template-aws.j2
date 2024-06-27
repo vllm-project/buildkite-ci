@@ -57,6 +57,25 @@ steps:
     command: bash .buildkite/run-xpu-test.sh
 
   {% for step in steps %}
+  {% if step.multi_node == True %}
+  - label: "{{ step.label }}"
+    agents:
+      queue: gpu_4_queue
+    soft_fail: {{ step.soft_fail or false }}
+    plugins:
+      - docker-compose#v5.2.0:
+        run: container1
+        config: docker-compose.yml
+      - docker-compose#v5.2.0:
+        run: container2
+        config: docker-compose.yml
+    commands:
+      - docker-compose exec container1 bash -c "echo cont1"
+      - docker-compose exec container2 bash -c "echo cont2"
+  {% endif %}
+  {% endfor %}  
+
+  {% for step in steps %}
   {% if step.gpu != "a100" %}
   - label: "{{ step.label }}"
     agents:

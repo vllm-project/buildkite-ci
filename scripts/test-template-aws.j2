@@ -65,10 +65,10 @@ steps:
     plugins:
       - docker-compose#v5.2.0:
         run: container1
-        config: docker-compose.yml
+        config: .buildkite/docker-compose.yml
       - docker-compose#v5.2.0:
         run: container2
-        config: docker-compose.yml
+        config: .buildkite/docker-compose.yml
   {% endif %}
   {% endfor %}  
 

@@ -69,9 +69,6 @@ steps:
       - docker-compose#v5.2.0:
         run: container2
         config: docker-compose.yml
-    commands:
-      - docker-compose exec container1 bash -c "echo cont1"
-      - docker-compose exec container2 bash -c "echo cont2"
   {% endif %}
   {% endfor %}  
 

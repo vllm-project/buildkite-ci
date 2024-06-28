@@ -57,21 +57,9 @@ steps:
     command: bash .buildkite/run-xpu-test.sh
 
   {% for step in steps %}
-  {% if step.multi_node == True %}
+  {% if step.gpu != "a100" %}
   - label: "{{ step.label }}"
-    agents:
-      queue: gpu_4_queue
-    soft_fail: {{ step.soft_fail or false }}
-    plugins:
-      - docker-compose#v5.2.0:
-        run: container1
-        config: docker-compose.yml
-  {% endif %}
-  {% endfor %}  
-
-  {% for step in steps %}
-  {% if step.gpu != "a100" and step.multi_node != True %}
-  - label: "{{ step.label }}"
+    priority: 100
     agents:
       {% if step.label == "Documentation Build" %}
       queue: small_cpu_queue
@@ -103,7 +91,11 @@ steps:
           {% if step.label == "Benchmarks" %}
           mount-buildkite-agent: true
           {% endif %}
+          {% if step.num_nodes >= 2 %}
+          command: ["bash", "-c", "cd {{ (step.working_dir or default_working_dir) | safe  }}", "docker network create --subnet=192.168.10.0/24 docker-net", "docker run --gpus '"device=0,1"' -it --network my-custom-network --ip 192.168.10.10 public.ecr.aws/q9t5s3a7/vllm-ci-test-repo:f31c1f90e381967d25591a8928782d8a6a13693e nvidia-smi", "docker run --gpus '"device=2,3"' -it --network my-custom-network --ip 192.168.10.11 public.ecr.aws/q9t5s3a7/vllm-ci-test-repo:f31c1f90e381967d25591a8928782d8a6a13693e nvidia-smi"]
+          {% else %}
           command: ["bash", "-c", "cd {{ (step.working_dir or default_working_dir) | safe  }} && {{ step.command  or (step.commands | join(' && ')) | safe }}"]
+          {% endif %}
           environment:
             - VLLM_USAGE_SOURCE=ci-test
             - HF_HOME={{ hf_home }}

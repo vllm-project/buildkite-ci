@@ -10,7 +10,7 @@ terraform {
     }
     buildkite = {
       source  = "buildkite/buildkite"
-      version = "0.19.1"
+      version = "1.10.1"
     }
   }
   backend "s3" {}

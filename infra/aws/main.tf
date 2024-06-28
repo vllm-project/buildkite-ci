@@ -78,7 +78,7 @@ locals {
     gpu-4-queue = {
       BuildkiteQueue          = "gpu_4_queue" # Queue for jobs running on 4 GPUs
       InstanceTypes           = "g6.12xlarge" # 4 Nvidia L4 GPUs and 192GB memory.
-      MaxSize                 = 6
+      MaxSize                 = 3
       ECRAccessPolicy         = "readonly"
       InstanceOperatingSystem = "linux"
       OnDemandPercentage      = 100

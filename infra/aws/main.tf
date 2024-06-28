@@ -49,7 +49,7 @@ locals {
     small-cpu-queue = {
       BuildkiteQueue          = "small_cpu_queue"
       InstanceTypes           = "r6in.large" # r6in uses Intel Ice Lake which supports AVX-512 required by vLLM CPU backend.
-      MaxSize                 = 5
+      MaxSize                 = 10
       ECRAccessPolicy         = "poweruser"
       InstanceOperatingSystem = "linux"
       OnDemandPercentage      = 100
@@ -58,7 +58,7 @@ locals {
     cpu-queue = {
       BuildkiteQueue          = "cpu_queue"
       InstanceTypes           = "r6in.16xlarge" # r6in uses Intel Ice Lake which supports AVX-512 required by vLLM CPU backend. 16x large comes with 512GB memory, required for compiling CUDA kernel.
-      MaxSize                 = 5
+      MaxSize                 = 10
       ECRAccessPolicy         = "poweruser"
       InstanceOperatingSystem = "linux"
       OnDemandPercentage      = 100
@@ -68,7 +68,7 @@ locals {
     gpu-1-queue = {
       BuildkiteQueue          = "gpu_1_queue" # Queue for jobs running on 1 GPU
       InstanceTypes           = "g6.4xlarge"  # 1 Nvidia L4 GPU and 64GB memory.
-      MaxSize                 = 80
+      MaxSize                 = 40
       ECRAccessPolicy         = "readonly"
       InstanceOperatingSystem = "linux"
       OnDemandPercentage      = 100
@@ -78,7 +78,7 @@ locals {
     gpu-4-queue = {
       BuildkiteQueue          = "gpu_4_queue" # Queue for jobs running on 4 GPUs
       InstanceTypes           = "g6.12xlarge" # 4 Nvidia L4 GPUs and 192GB memory.
-      MaxSize                 = 10
+      MaxSize                 = 3
       ECRAccessPolicy         = "readonly"
       InstanceOperatingSystem = "linux"
       OnDemandPercentage      = 100

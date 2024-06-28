@@ -1,0 +1,18 @@
+# Priority classes for A100 pods
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: perf-benchmark
+value: 1
+preemptionPolicy: PreemptLowerPriority
+globalDefault: false
+description: "This priority class will be used for running performance benchmark."
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: ci
+value: 2
+preemptionPolicy: PreemptLowerPriority
+globalDefault: false
+description: "This priority class will be used for running CI tests."

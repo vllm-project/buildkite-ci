@@ -46,6 +46,7 @@ patterns=(
     "pyproject.toml"
     "requirements*"
     "setup.py"
+    "test_docs/"
 )
 for file in $diff; do
     for pattern in "${patterns[@]}"; do

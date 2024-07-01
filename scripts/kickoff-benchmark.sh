@@ -20,9 +20,12 @@ if [ "$BUILDKITE_PULL_REQUEST" != "false" ]; then
     echo "This PR has the 'nightly-benchmark' label. Proceeding with the nightly benchmarks."
     target_yaml_file=".buildkite/nightly-benchmarks/nightly-pipeline.yaml"
   fi
-else
+elif [ "$BUILDKITE_BRANCH" == "main" ]; then
   echo "This is a build from a new commit on main branch. Proceeding with the performance benchmark."
   target_yaml_file=".buildkite/nightly-benchmarks/benchmark-pipeline.yaml"
+else
+  echo "Skipping performance benchmark."
+  exit 0
 fi
 
 if [ -n "$target_yaml_file" ]; then

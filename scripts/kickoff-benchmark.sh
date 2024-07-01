@@ -5,6 +5,8 @@ set -euo pipefail
 
 target_yaml_file=""
 
+echo "${BUILDKITE_PULL_REQUEST}"
+
 # If BUILDKITE_PULL_REQUEST != "false", then we check the PR labels using curl and jq
 if [ "$BUILDKITE_PULL_REQUEST" != "false" ]; then
   PR_LABELS=$(curl -s "https://api.github.com/repos/vllm-project/vllm/pulls/$BUILDKITE_PULL_REQUEST" | jq -r '.labels[].name')

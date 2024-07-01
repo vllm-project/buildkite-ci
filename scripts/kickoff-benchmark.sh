@@ -3,9 +3,6 @@
 # NOTE(simon): this script runs inside a buildkite agent with CPU only access.
 set -euo pipefail
 
-# Install minijinja for templating
-curl -sSfL https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-installer.sh | sh
-source $HOME/.cargo/env
 target_yaml_file=""
 
 # If BUILDKITE_PULL_REQUEST != "false", then we check the PR labels using curl and jq

@@ -21,9 +21,11 @@ if [ "$BUILDKITE_PULL_REQUEST" != "false" ]; then
     echo "This PR has the 'nightly-benchmark' label. Proceeding with the nightly benchmarks."
     target_yaml_file=".buildkite/nightly-benchmarks/nightly-pipeline.yaml"
   fi
+else
+  echo "This is a build from a new commit on main branch. Proceeding with the performance benchmark."
+  target_yaml_file=".buildkite/nightly-benchmarks/benchmark-pipeline.yaml"
 fi
 
 if [ -n "$target_yaml_file" ]; then
-  # Upload sample.yaml
   buildkite-agent pipeline upload $target_yaml_file
 fi

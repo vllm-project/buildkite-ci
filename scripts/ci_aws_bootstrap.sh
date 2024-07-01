@@ -47,6 +47,7 @@ patterns=(
     "requirements*"
     "setup.py"
     "test_docs/"
+    "docs/"
 )
 for file in $diff; do
     for pattern in "${patterns[@]}"; do

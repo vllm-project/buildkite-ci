@@ -7,6 +7,12 @@ upload_pipeline() {
     ls .buildkite || buildkite-agent annotate --style error 'Please merge upstream main branch for buildkite CI'
     curl -sSfL https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-installer.sh | sh
     source /var/lib/buildkite-agent/.cargo/env
+    if [ $BUILDKITE_PIPELINE_SLUG == "fastcheck" ]; then
+        cd .buildkite && minijinja-cli test-template-fastcheck.j2 test-pipeline.yaml > pipeline.yml
+        cat pipeline.yml
+        buildkite-agent pipeline upload pipeline.yml
+        exit 0
+    fi
     if [ ! -e ".buildkite/test-template.j2" ]; then
         curl -o .buildkite/test-template.j2 https://raw.githubusercontent.com/vllm-project/buildkite-ci/main/scripts/test-template-aws.j2
     fi

@@ -58,7 +58,6 @@ steps:
   {% for step in steps %}
   {% if step.num_nodes >= 2 %}
   - label: "{{ step.label }}"
-    priority: 1000
     agents:
       queue: gpu_4_queue
     commands:

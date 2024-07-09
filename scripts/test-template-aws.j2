@@ -55,9 +55,19 @@ steps:
     agents:
       queue: intel-gpu
     command: bash .buildkite/run-xpu-test.sh
+  {% for step in steps %}
+  {% if step.num_nodes >= 2 %}
+  - label: "{{ step.label }}"
+    priority: 1000
+    agents:
+      queue: gpu_4_queue
+    commands:
+      - ./.buildkite/run-multi-node-test.sh {{ step.num_nodes }} {{ step.num_gpus }} {{ docker_image }} {% for command in step.commands %}"{{ command }}" {% endfor %}
+  {% endif %}
+  {% endfor %}
 
   {% for step in steps %}
-  {% if step.gpu != "a100" %}
+  {% if step.gpu != "a100" and step.num_nodes < 2 %}
   - label: "{{ step.label }}"
     agents:
       {% if step.label == "Documentation Build" %}

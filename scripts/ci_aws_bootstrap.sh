@@ -14,7 +14,7 @@ upload_pipeline() {
         exit 0
     fi
     if [ ! -e ".buildkite/test-template.j2" ]; then
-        curl -o .buildkite/test-template.j2 https://raw.githubusercontent.com/vllm-project/buildkite-ci/main/scripts/test-template-aws.j2
+        curl -o .buildkite/test-template.j2 https://raw.githubusercontent.com/adityagoel14/buildkite-ci/main/scripts/test-template-aws.j2
     fi
     cd .buildkite && minijinja-cli test-template.j2 test-pipeline.yaml > pipeline.yml
     cat pipeline.yml

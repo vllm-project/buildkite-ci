@@ -5,6 +5,25 @@
   - group: "AMD Tests"
     depends_on: ~
     steps:
+      - label: ":docker: build image"
+        commands:
+          - "docker build --build-arg max_jobs=16 --tag {{ docker_image_amd }} -f Dockerfile.rocm --progress plain ."
+          - "docker push {{ docker_image_amd }}"
+        plugins:
+          - docker-login#v3.0.0:
+              username: rocmshared
+        key: "amd-build"
+        env:
+          DOCKER_BUILDKIT: "1"
+        retry:
+          automatic:
+            - exit_status: -1  # Agent was lost
+              limit: 5
+            - exit_status: -10  # Agent was lost
+              limit: 5
+        agents:
+          queue: amd-gpu
+
     {% for step in steps %}
     {% if step.mirror_hardwares and "amd" in step.mirror_hardwares %}
       - label: "AMD: {{ step.label }}"

@@ -41,7 +41,7 @@ steps:
     depends_on: ~
     agents:
       queue: tpu
-    command: if [[ -f ".buildkite/run-tpu-test.sh" ]]; then bash .buildkite/run-tpu-test.sh; fi 
+    command: if [[ -f ".buildkite/run-tpu-test.sh" ]]; then sudo bash .buildkite/run-tpu-test.sh; fi 
 
   - label: "Neuron Test"
     depends_on: ~

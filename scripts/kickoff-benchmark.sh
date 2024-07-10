@@ -7,8 +7,9 @@ set -euo pipefail
 (which tar) || (apt update && apt install -y tar)
 (which wget) || (apt update && apt install -y wget)
 (which yq) || (wget https://github.com/mikefarah/yq/releases/download/v4.44.2/yq_linux_amd64.tar.gz -O - |\
-  tar xz && mv yq_linux_amd64 /usr/bin/yq)
+  tar xz)
 
+alias yq='./yq_linux_amd64'
 
 # the final buildkite pipeline
 rm -f final.yaml

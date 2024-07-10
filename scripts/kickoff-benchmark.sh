@@ -48,3 +48,4 @@ if [ -s final.yaml ]; then
   # final.yaml is not an empty file. Proceed with the pipeline upload.
   buildkite-agent pipeline upload final.yaml
 fi
+

@@ -4,8 +4,10 @@
 set -euo pipefail
 
 # install yq to merge yaml files
-(which add-apt-repository) || (apt update && apt install software-properties-common)
-(which yq) || (add-apt-repository ppa:rmescandon/yq -y && apt update && apt install yq -y)
+(which tar) || (apt update && apt install -y tar)
+(which wget) || (apt update && apt install -y wget)
+(which yq) || (wget https://github.com/mikefarah/yq/releases/download/v4.44.2/yq_linux_amd64.tar.gz -O - |\
+  tar xz && mv yq_linux_amd64 /usr/bin/yq)
 
 
 # the final buildkite pipeline

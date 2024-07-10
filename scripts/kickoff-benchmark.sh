@@ -6,9 +6,11 @@ set -euo pipefail
 # install yq to merge yaml files
 (which tar) || (apt update && apt install -y tar)
 (which wget) || (apt update && apt install -y wget)
-(which yq) || (wget https://github.com/mikefarah/yq/releases/download/v4.44.2/yq_linux_amd64.tar.gz -O - |\
-  tar xz)
 
+# download yq binary
+rm -f yq_linux_amd64
+(wget https://github.com/mikefarah/yq/releases/download/v4.44.2/yq_linux_amd64.tar.gz -O - |\
+  tar xz)
 vllm_root_directory=$(pwd)
 
 # the final buildkite pipeline
@@ -20,6 +22,7 @@ merge () {
   $vllm_root_directory/yq_linux_amd64 -n "load(\"final.yaml\") *+ (load(\"$1\") | explode(.))" > temp.yaml
   mv temp.yaml final.yaml
 }
+
 
 # If BUILDKITE_PULL_REQUEST != "false", then we check the PR labels using curl and jq
 if [ "$BUILDKITE_PULL_REQUEST" != "false" ]; then

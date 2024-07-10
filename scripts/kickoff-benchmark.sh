@@ -9,7 +9,7 @@ set -euo pipefail
 (which yq) || (wget https://github.com/mikefarah/yq/releases/download/v4.44.2/yq_linux_amd64.tar.gz -O - |\
   tar xz)
 
-alias yq='./yq_linux_amd64'
+vllm_root_directory=$(pwd)
 
 # the final buildkite pipeline
 rm -f final.yaml
@@ -17,7 +17,7 @@ touch final.yaml
 
 merge () {
   # append $1 to final.yaml, and resolve anchors
-  yq -n "load(\"final.yaml\") *+ (load(\"$1\") | explode(.))" > temp.yaml
+  $vllm_root_directory/yq_linux_amd64 -n "load(\"final.yaml\") *+ (load(\"$1\") | explode(.))" > temp.yaml
   mv temp.yaml final.yaml
 }
 

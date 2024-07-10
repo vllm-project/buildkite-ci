@@ -12,9 +12,6 @@ rm -f final.yaml
 touch final.yaml
 
 merge () {
-  # merge the yaml file (specified by $1) to final.yaml
-  rm -f temp.yaml
-  touch temp.yaml
   # append $1 to final.yaml, and resolve anchors
   yq -n "load(\"final.yaml\") *+ (load(\"$1\") | explode(.))" > temp.yaml
   mv temp.yaml final.yaml

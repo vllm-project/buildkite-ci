@@ -4,7 +4,7 @@
 set -euo pipefail
 
 # install yq to merge yaml files
-(which add-apt-repository) || (apt install software-properties-common)
+(which add-apt-repository) || (apt update && apt install software-properties-common)
 (which yq) || (add-apt-repository ppa:rmescandon/yq -y && apt update && apt install yq -y)
 
 

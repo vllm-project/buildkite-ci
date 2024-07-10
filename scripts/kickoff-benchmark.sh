@@ -3,29 +3,46 @@
 # NOTE(simon): this script runs inside a buildkite agent with CPU only access.
 set -euo pipefail
 
-target_yaml_file=""
+# install yq to merge yaml files
+(which yq) || (add-apt-repository ppa:rmescandon/yq -y && apt update && apt install yq -y)
+
+
+# the final buildkite pipeline
+rm -f final.yaml
+touch final.yaml
+
+merge () {
+  # append $1 to final.yaml, and resolve anchors
+  yq -n "load(\"final.yaml\") *+ (load(\"$1\") | explode(.))" > temp.yaml
+  mv temp.yaml final.yaml
+}
 
 # If BUILDKITE_PULL_REQUEST != "false", then we check the PR labels using curl and jq
 if [ "$BUILDKITE_PULL_REQUEST" != "false" ]; then
   PR_LABELS=$(curl -s "https://api.github.com/repos/vllm-project/vllm/pulls/$BUILDKITE_PULL_REQUEST" | jq -r '.labels[].name')
 
-  if [[ $PR_LABELS == *"perf-benchmarks"* ]]; then
-    echo "This PR has the 'perf-benchmarks' label. Proceeding with the performance benchmarks."
-    target_yaml_file=".buildkite/nightly-benchmarks/benchmark-pipeline.yaml"
-  fi
-
+  # put nightly benchmark in the front, as it contains a blocking step.
   if [[ $PR_LABELS == *"nightly-benchmarks"* ]]; then
     echo "This PR has the 'nightly-benchmark' label. Proceeding with the nightly benchmarks."
-    target_yaml_file=".buildkite/nightly-benchmarks/nightly-pipeline.yaml"
+    merge ".buildkite/nightly-benchmarks/nightly-pipeline.yaml"
   fi
+
+  if [[ $PR_LABELS == *"perf-benchmarks"* ]]; then
+    echo "This PR has the 'perf-benchmarks' label. Proceeding with the performance benchmarks."
+    merge ".buildkite/nightly-benchmarks/benchmark-pipeline.yaml"
+  fi
+
 elif [ "$BUILDKITE_BRANCH" == "main" ]; then
   echo "This is a build from a new commit on main branch. Proceeding with the performance benchmark."
-  target_yaml_file=".buildkite/nightly-benchmarks/benchmark-pipeline.yaml"
+  merge ".buildkite/nightly-benchmarks/benchmark-pipeline.yaml"
 else
   echo "Skipping performance benchmark."
   exit 0
 fi
 
-if [ -n "$target_yaml_file" ]; then
-  buildkite-agent pipeline upload $target_yaml_file
+
+if [ -s final.yaml ]; then
+  # final.yaml is not an empty file. Proceed with the pipeline upload.
+  buildkite-agent pipeline upload final.yaml
 fi
+

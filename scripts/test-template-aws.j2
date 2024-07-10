@@ -22,7 +22,7 @@
             - exit_status: -10  # Agent was lost
               limit: 5
         agents:
-          queue: amd-gpu
+          queue: amd-cpu
 
     {% for step in steps %}
     {% if step.mirror_hardwares and "amd" in step.mirror_hardwares %}

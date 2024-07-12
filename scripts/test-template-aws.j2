@@ -94,7 +94,7 @@ steps:
   {% endfor %}
 
   {% for step in steps %}
-  {% if step.gpu != "a100" and step.num_nodes < 2 %}
+  {% if step.gpu != "a100" and step.num_nodes < 2 and step.fast_check_only != true %}
   - label: "{{ step.label }}"
     agents:
       {% if step.label == "Documentation Build" %}

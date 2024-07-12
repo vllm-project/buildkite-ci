@@ -91,9 +91,11 @@ steps:
   {% for step in steps %}
   {% if step.gpu != "a100" and step.fast_check != true %}
   - block: "Run {{ step.label }}"
+    key: block-{{ step.label | replace(" ", "-") | lower | replace("(", "") | replace(")", "") | replace("%", "") | replace(",", "-") }}
     depends_on: image_build
 
   - label: "{{ step.label }}"
+    depends_on: block-{{ step.label | replace(" ", "-") | lower | replace("(", "") | replace(")", "") | replace("%", "") | replace(",", "-") }}
     agents:
       {% if step.label == "Documentation Build" %}
       queue: small_cpu_queue

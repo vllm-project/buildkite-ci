@@ -43,7 +43,6 @@ steps:
   {% if step.gpu != "a100" and step.fast_check == true %}
   - label: "{{ step.label }}"
     depends_on: image-build
-    priority: 10000
     agents:
       {% if step.label == "Documentation Build" %}
       queue: small_cpu_queue

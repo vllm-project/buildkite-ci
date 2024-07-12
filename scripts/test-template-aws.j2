@@ -24,7 +24,7 @@ steps:
 
   - group: "AMD Tests"
     steps:
-      - label: ":docker: build image"
+      - label: "AMD: :docker: build image"
         depends_on: ~
         commands:
           - "docker build --build-arg max_jobs=16 --tag {{ docker_image_amd }} -f Dockerfile.rocm --progress plain ."

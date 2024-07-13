@@ -46,17 +46,7 @@ steps:
     command: bash .buildkite/run-xpu-test.sh
 
   {% for step in steps %}
-  {% if step.num_nodes >= 2 %}
-  - label: "{{ step.label }}"
-    agents:
-      queue: gpu_4_queue
-    commands:
-      - ./.buildkite/run-multi-node-test.sh {{ (step.working_dir or default_working_dir) | safe  }} {{ step.num_nodes }} {{ step.num_gpus }} {{ docker_image }} {% for command in step.commands %}"{{ (command | join(" && ")) | safe }}" {% endfor %}
-  {% endif %}
-  {% endfor %}
-
-  {% for step in steps %}
-  {% if step.gpu != "a100" and step.fast_check == true %}
+  {% if step.gpu != "a100" and step.fast_check == true and step.num_nodes < 2 %}
   - label: "{{ step.label }}"
     depends_on: image-build
     agents:
@@ -154,6 +144,21 @@ steps:
           volumes:
             - /dev/shm:/dev/shm
             - {{ hf_home }}:{{ hf_home }}
+  {% endif %}
+  {% endfor %}
+
+  {% for step in steps %}
+  {% if step.num_nodes >= 2 %}
+  - block: "Run {{ step.label }}"
+    key: block-{{ step.label | replace(" ", "-") | lower | replace("(", "") | replace(")", "") | replace("%", "") | replace(",", "-") }}
+    depends_on: image-build
+
+  - label: "{{ step.label }}"
+    depends_on: block-{{ step.label | replace(" ", "-") | lower | replace("(", "") | replace(")", "") | replace("%", "") | replace(",", "-")
+    agents:
+      queue: gpu_4_queue
+    commands:
+      - ./.buildkite/run-multi-node-test.sh {{ (step.working_dir or default_working_dir) | safe  }} {{ step.num_nodes }} {{ step.num_gpus }} {{ docker_image }} {% for command in step.commands %}"{{ (command | join(" && ")) | safe }}" {% endfor %}
   {% endif %}
   {% endfor %}
 

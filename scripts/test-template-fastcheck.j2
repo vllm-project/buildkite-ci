@@ -95,7 +95,7 @@ steps:
   {% endfor %}
 
   {% for step in steps %}
-  {% if step.gpu != "a100" and step.fast_check != true %}
+  {% if step.gpu != "a100" and step.fast_check != true and step.num_nodes < 2 %}
   - block: "Run {{ step.label }}"
     key: block-{{ step.label | replace(" ", "-") | lower | replace("(", "") | replace(")", "") | replace("%", "") | replace(",", "-") }}
     depends_on: image-build

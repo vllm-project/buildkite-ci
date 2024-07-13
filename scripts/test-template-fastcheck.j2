@@ -154,7 +154,7 @@ steps:
     depends_on: image-build
 
   - label: "{{ step.label }}"
-    depends_on: block-{{ step.label | replace(" ", "-") | lower | replace("(", "") | replace(")", "") | replace("%", "") | replace(",", "-")
+    depends_on: block-{{ step.label | replace(" ", "-") | lower | replace("(", "") | replace(")", "") | replace("%", "") | replace(",", "-") }}
     agents:
       queue: gpu_4_queue
     commands:

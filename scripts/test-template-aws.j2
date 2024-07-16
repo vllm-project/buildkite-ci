@@ -11,11 +11,12 @@ steps:
     commands:
       - "aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/q9t5s3a7"
       - |
-        if docker pull {{ docker_image }}; then
-          echo "Successfully pulled {{ docker_image }}"
-          exit 0
+        #!/bin/bash
+        if [[ -z $(docker manifest inspect {{ docker_image }}) ]]; then
+          echo "Image not found, proceeding with build..."
         else
-          echo "Failed to pull {{ docker_image }}, proceeding with build..."
+          echo "Image found"
+          exit 0
         fi
       - "docker build --build-arg max_jobs=16 --build-arg buildkite_commit=$BUILDKITE_COMMIT --build-arg USE_SCCACHE=1 --tag {{ docker_image }} --target test --progress plain ."
       - "docker push {{ docker_image }}"

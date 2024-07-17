@@ -28,7 +28,6 @@ steps:
           limit: 5
         - exit_status: -10  # Agent was lost
           limit: 5
-  - wait
 
   - group: "AMD Tests"
     steps:
@@ -86,14 +85,20 @@ steps:
       queue: intel-cpu
     command: bash .buildkite/run-cpu-test.sh
 
+  - block: "Run Intel GPU Test"
+    key: block-intel-gpu-test
+    depend_on: ~
+
   - label: "Intel GPU Test"
-    depends_on: ~
+    depends_on: block-intel-gpu-test
     agents:
       queue: intel-gpu
     command: bash .buildkite/run-xpu-test.sh
+
   {% for step in steps %}
   {% if step.num_nodes >= 2 %}
   - label: "{{ step.label }}"
+    depends_on: image-build
     agents:
       queue: gpu_4_queue
     commands:
@@ -104,6 +109,7 @@ steps:
   {% for step in steps %}
   {% if step.gpu != "a100" and step.num_nodes < 2 and step.fast_check_only != true %}
   - label: "{{ step.label }}"
+    depends_on: image-build
     agents:
       {% if step.label == "Documentation Build" %}
       queue: small_cpu_queue

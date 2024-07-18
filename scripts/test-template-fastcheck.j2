@@ -20,12 +20,6 @@ steps:
         - exit_status: -10  # Agent was lost
           limit: 5
 
-  - label: "TPU Test"
-    depends_on: ~
-    agents:
-      queue: tpu
-    command: if [[ -f ".buildkite/run-tpu-test.sh" ]]; then bash .buildkite/run-tpu-test.sh; fi
-
   - label: "Neuron Test"
     depends_on: ~
     agents:

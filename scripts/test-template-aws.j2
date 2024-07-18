@@ -85,12 +85,7 @@ steps:
       queue: intel-cpu
     command: bash .buildkite/run-cpu-test.sh
 
-  - block: "Run Intel GPU Test"
-    key: block-intel-gpu-test
-    depends_on: ~
-
   - label: "Intel GPU Test"
-    depends_on: block-intel-gpu-test
     agents:
       queue: intel-gpu
     command: bash .buildkite/run-xpu-test.sh

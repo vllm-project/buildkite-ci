@@ -66,12 +66,6 @@ steps:
     {% endif %}
     {% endfor %}
 
-  - label: "TPU Test"
-    depends_on: ~
-    agents:
-      queue: tpu
-    command: if [[ -f ".buildkite/run-tpu-test.sh" ]]; then bash .buildkite/run-tpu-test.sh; fi 
-
   - label: "Neuron Test"
     depends_on: ~
     agents:

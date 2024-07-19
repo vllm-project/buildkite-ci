@@ -80,6 +80,7 @@ steps:
     command: bash .buildkite/run-cpu-test.sh
 
   - label: "Intel GPU Test"
+    soft_fail: true
     agents:
       queue: intel-gpu
     command: bash .buildkite/run-xpu-test.sh

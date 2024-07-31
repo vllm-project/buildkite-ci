@@ -51,6 +51,7 @@ patterns=(
     "Dockerfile"
     "format.sh"
     "pyproject.toml"
+    "CMakeLists.txt"
     "requirements*"
     "setup.py"
     "test_docs/"

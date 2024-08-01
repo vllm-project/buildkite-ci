@@ -87,6 +87,7 @@ steps:
     command: bash .buildkite/run-xpu-test.sh
   
   {% for step in steps %}
+  {% if step.fast_check_only != "true" %}
 
   {% set ns = namespace(blocked=0) %}
   
@@ -207,4 +208,5 @@ steps:
                 type: Directory
       {% endif %}
     {% endif %}
+  {% endif %}
   {% endfor %}

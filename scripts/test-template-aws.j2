@@ -30,7 +30,7 @@ steps:
         - exit_status: -10  # Agent was lost
           limit: 5
   - block: "Run AMD tests"
-    depend_on: ~
+    depends_on: ~
     key: block-amd-tests
   - group: "AMD Tests"
     steps:

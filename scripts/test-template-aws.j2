@@ -94,7 +94,6 @@ steps:
   {% if step.source_file_dependency %}
     {% for source_file in step.source_file_dependency %}
       {% for file in list_file_diff %}
-        {{file}} compare {{source_file}}
         {% if source_file in file %}
           {% set ns.blocked = 0 %}
         {% endif %}

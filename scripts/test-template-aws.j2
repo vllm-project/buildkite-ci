@@ -169,7 +169,7 @@ steps:
         podSpec:
           priorityClassName: ci
           containers:
-          - image: public.ecr.aws/q9t5s3a7/vllm-ci-test-repo:f17f03744ebabed187634baec601ef35094ae14f
+          - image: {{ docker_image }}
             command: ["bash"]
             args:
             - '-c'

@@ -88,7 +88,7 @@ steps:
   
   {% for step in steps %}
 
-  {% set ns = namespace(blocked=1) %}
+  {% set ns = namespace(blocked=0) %}
   
 
   {% if step.source_file_dependency %}

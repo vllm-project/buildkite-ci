@@ -88,20 +88,22 @@ steps:
   
   {% for step in steps %}
 
-  {% set ns = namespace(blocked=0) %}
-  {% if step.gpu == "a100" %}
-  {% set ns.blocked = 1 %}
-  {% endif %}
+  {% set ns = namespace(blocked=1) %}
+  
 
   {% if step.source_file_dependency %}
     {% for source_file in step.source_file_dependency %}
       {% for file in list_file_diff %}
         {{file}} compare {{source_file}}
         {% if source_file in file %}
-          {% set ns.blocked = 1 %}
+          {% set ns.blocked = 0 %}
         {% endif %}
       {% endfor %}
     {% endfor %}
+  {% endif %}
+
+  {% if step.gpu == "a100" %}
+  {% set ns.blocked = 1 %}
   {% endif %}
 
   {% if ns.blocked == 1 %}

@@ -2,6 +2,7 @@
 {% set docker_image_amd = "rocmshared/vllm-ci:$BUILDKITE_COMMIT" %}
 {% set default_working_dir = "/vllm-workspace/tests" %}
 {% set hf_home = "/root/.cache/huggingface" %}
+{% set list_file_diff = list_file_diff | split("|") %}
 
 steps:
   - label: ":docker: build image"
@@ -84,22 +85,35 @@ steps:
     agents:
       queue: intel-gpu
     command: bash .buildkite/run-xpu-test.sh
-
+  
   {% for step in steps %}
-  {% if step.num_nodes >= 2 %}
-  - label: "{{ step.label }}"
-    depends_on: image-build
-    agents:
-      queue: gpu_4_queue
-    commands:
-      - ./.buildkite/run-multi-node-test.sh {{ (step.working_dir or default_working_dir) | safe  }} {{ step.num_nodes }} {{ step.num_gpus }} {{ docker_image }} {% for command in step.commands %}"{{ (command | join(" && ")) | safe }}" {% endfor %}
+
+  {% set ns = namespace(blocked=0) %}
+  {% if step.gpu == "a100" %}
+  {% set ns.blocked = 1 %}
   {% endif %}
-  {% endfor %}
 
-  {% for step in steps %}
-  {% if step.gpu != "a100" and step.num_nodes < 2 and step.fast_check_only != true %}
+  {% if step.source_file_dependency %}
+    {% for source_file in step.source_file_dependency %}
+      {% for file in list_file_diff %}
+        {{file}} compare {{source_file}}
+        {% if source_file in file %}
+          {% set ns.blocked = 1 %}
+        {% endif %}
+      {% endfor %}
+    {% endfor %}
+  {% endif %}
+
+  {% if ns.blocked == 1 %}
+  - block: "Run {{ step.label }}"
+    depends_on: image_build
+    key: block-{{ step.label | replace(" ", "-") | lower | replace("(", "") | replace(")", "") | replace("%", "") | replace(",", "-") }}
+  {% endif %}
+
   - label: "{{ step.label }}"
-    depends_on: image-build
+    {% if ns.blocked == 1 %}
+    depends_on: block-{{ step.label | replace(" ", "-") | lower | replace("(", "") | replace(")", "") | replace("%", "") | replace(",", "-") }}
+    {% endif %}
     agents:
       {% if step.label == "Documentation Build" %}
       queue: small_cpu_queue
@@ -107,9 +121,15 @@ steps:
       queue: cpu_queue
       {% elif step.num_gpus == 2 or step.num_gpus == 4 %}
       queue: gpu_4_queue
+      {% elif step.gpu == "a100" %}
+      queue: a100-queue
       {% else %}
       queue: gpu_1_queue
       {% endif %}
+    {% if step.num_nodes >= 2%} {# for multi-node test #}
+    commands:
+      - ./.buildkite/run-multi-node-test.sh {{ (step.working_dir or default_working_dir) | safe  }} {{ step.num_nodes }} {{ step.num_gpus }} {{ docker_image }} {% for command in step.commands %}"{{ (command | join(" && ")) | safe }}" {% endfor %}
+    {% endif %}
     soft_fail: {{ step.soft_fail or false }}
     {% if step.parallelism %}
     parallelism: {{ step.parallelism }}
@@ -117,11 +137,13 @@ steps:
     retry:
       automatic:
         - exit_status: -1  # Agent was lost
-          limit: 5
+          limit: 2
         - exit_status: -10  # Agent was lost
-          limit: 5
+          limit: 2
+    {% if step.num_nodes < 2 %}
     plugins:
-      - docker#v5.2.0:
+      {% if step.gpu != "a100" %}
+      - docker#v5.2.0: {# for GPU test #}
           image: {{ docker_image }}
           always-pull: true
           propagate-environment: true
@@ -142,30 +164,8 @@ steps:
           volumes:
             - /dev/shm:/dev/shm
             - {{ hf_home }}:{{ hf_home }}
-  {% endif %}
-  {% endfor %}
-
-  - block: "Run A100 tests"
-    depends_on: image-build
-
-  {% for step in steps %}
-  {% if step.gpu == "a100" %}
-  - label: "{{ step.label }}"
-    priority: 10000
-    agents:
-      queue: a100-queue
-    soft_fail: {{ step.soft_fail or false }}
-    {% if step.parallelism %}
-    parallelism: {{ step.parallelism }}
-    {% endif %}
-    retry:
-      automatic:
-        - exit_status: -1  # Agent was lost
-          limit: 5
-        - exit_status: -10  # Agent was lost
-          limit: 5
-    plugins:
-    - kubernetes:
+      {% else %} {# A100 is managed on EKS #}
+        - kubernetes:
         podSpec:
           priorityClassName: ci
           containers:
@@ -202,5 +202,6 @@ steps:
             hostPath:
               path: {{ hf_home }}
               type: Directory
-  {% endif %}
+      {% endif %}
+    {% endif %}
   {% endfor %}

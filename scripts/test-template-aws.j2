@@ -91,9 +91,8 @@ steps:
 
   {% set ns = namespace(blocked=0) %}
   
-
-  {% if step.source_file_dependency %}
-    {% for source_file in step.source_file_dependency %}
+  {% if step.source_file_dependencies %}
+    {% for source_file in step.source_file_dependencies %}
       {% for file in list_file_diff %}
         {% if source_file in file %}
           {% set ns.blocked = 0 %}

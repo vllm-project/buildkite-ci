@@ -89,7 +89,7 @@ steps:
   {% for step in steps %}
   {% if step.fast_check_only != true %}
 
-  {% set ns = namespace(blocked=0) %}
+  {% set ns = namespace(blocked=1) %}
   
   {% if step.source_file_dependencies %}
     {% for source_file in step.source_file_dependencies %}
@@ -99,6 +99,8 @@ steps:
         {% endif %}
       {% endfor %}
     {% endfor %}
+  {% else %}
+    {% set ns.blocked = 0 %}
   {% endif %}
 
   {% if step.gpu == "a100" %}

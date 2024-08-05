@@ -2,6 +2,10 @@
 
 set -euo pipefail
 
+if [[ -z "${RUN_ALL:-}" ]]; then
+    RUN_ALL=0
+fi
+
 upload_pipeline() {
     echo "Uploading pipeline..."
     ls .buildkite || buildkite-agent annotate --style error 'Please merge upstream main branch for buildkite CI'
@@ -19,7 +23,7 @@ upload_pipeline() {
     fi
     cd .buildkite
     echo $list_file_diff
-    minijinja-cli test-template.j2 test-pipeline.yaml -D list_file_diff="$list_file_diff" > pipeline.yml
+    minijinja-cli test-template.j2 test-pipeline.yaml -D list_file_diff="$LIST_FILE_DIFF" -D run_all="$RUN_ALL" > pipeline.yml
     buildkite-agent pipeline upload pipeline.yml
     exit 0
 }
@@ -29,5 +33,23 @@ get_diff() {
     echo $(git diff --name-only --diff-filter=ACMDR $(git merge-base origin/main HEAD))
 }
 
-list_file_diff=$(get_diff | tr ' ' '|')
+patterns=(
+    ".buildkite/"
+    "Dockerfile"
+    "CMakeLists.txt"
+    "requirements*"
+    "setup.py"
+)
+for file in $diff; do
+    for pattern in "${patterns[@]}"; do
+        if [[ $file == $pattern* ]] || [[ $file == $pattern ]]; then
+            RUN_ALL=1
+            echo "Found changes: $file. Run all tests"
+            break
+        fi
+    done
+done
+
+LIST_FILE_DIFF=$(get_diff | tr ' ' '|')
+
 upload_pipeline

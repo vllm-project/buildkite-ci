@@ -90,7 +90,11 @@ steps:
   {% if step.fast_check_only != true %}
 
   {% set ns = namespace(blocked=1) %}
-  
+
+  {% if run_all == 1 %}
+  {% set ns.blocked = 0 %}
+  {% endif %}
+
   {% if step.source_file_dependencies %}
     {% for source_file in step.source_file_dependencies %}
       {% for file in list_file_diff %}

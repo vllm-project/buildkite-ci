@@ -22,7 +22,7 @@ upload_pipeline() {
         curl -o .buildkite/test-template.j2 https://raw.githubusercontent.com/vllm-project/buildkite-ci/main/scripts/test-template-aws.j2
     fi
     cd .buildkite
-    echo $list_file_diff
+    echo $LIST_FILE_DIFF
     minijinja-cli test-template.j2 test-pipeline.yaml -D list_file_diff="$LIST_FILE_DIFF" -D run_all="$RUN_ALL" > pipeline.yml
     buildkite-agent pipeline upload pipeline.yml
     exit 0

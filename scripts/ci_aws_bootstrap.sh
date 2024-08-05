@@ -33,6 +33,8 @@ get_diff() {
     echo $(git diff --name-only --diff-filter=ACMDR $(git merge-base origin/main HEAD))
 }
 
+file_diff=$(get_diff)
+
 patterns=(
     ".buildkite/"
     "Dockerfile"
@@ -40,7 +42,7 @@ patterns=(
     "requirements*"
     "setup.py"
 )
-for file in $diff; do
+for file in $file_diff; do
     for pattern in "${patterns[@]}"; do
         if [[ $file == $pattern* ]] || [[ $file == $pattern ]]; then
             RUN_ALL=1

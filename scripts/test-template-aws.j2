@@ -35,7 +35,7 @@ steps:
 
   {% set ns = namespace(blocked=1) %}
 
-  {% if run_all == 1 %}
+  {% if run_all == "1" %}
   {% set ns.blocked = 0 %}
   {% endif %}
 

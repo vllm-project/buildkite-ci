@@ -33,7 +33,15 @@ get_diff() {
     echo $(git diff --name-only --diff-filter=ACMDR $(git merge-base origin/main HEAD))
 }
 
+get_diff_main() {
+    $(git add .)
+    echo $(git diff --name-only --diff-filter=ACMDR HEAD~1)
+}
+
 file_diff=$(get_diff)
+if [[ $BUILDKITE_BRANCH == "main" ]]; then
+    file_diff=$(get_diff_main)
+fi
 
 patterns=(
     ".buildkite/"
@@ -53,5 +61,7 @@ for file in $file_diff; do
 done
 
 LIST_FILE_DIFF=$(get_diff | tr ' ' '|')
-
+if [[ $BUILDKITE_BRANCH == "main" ]]; then
+    LIST_FILE_DIFF=$(get_diff_main | tr ' ' '|')
+fi
 upload_pipeline

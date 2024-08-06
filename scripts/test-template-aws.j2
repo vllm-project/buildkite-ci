@@ -161,6 +161,7 @@ steps:
   {% endfor %}
 
   - group: "AMD Tests"
+    depends_on: ~
     steps:
       - label: "AMD: :docker: build image"
         depends_on: ~

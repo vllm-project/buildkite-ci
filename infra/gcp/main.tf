@@ -32,22 +32,6 @@ resource "google_compute_disk" "disk" {
   zone  = "us-south1-a"
 }
 
-resource "google_compute_subnetwork" "subnet" {
-  provider = google-beta
-
-  name          = "tpu-subnet"
-  ip_cidr_range = "10.0.0.0/16"
-  region        = "us-south1"
-  network       = google_compute_network.network.id
-}
-
-resource "google_compute_network" "network" {
-  provider = google-beta
-
-  name                    = "tpu-net"
-  auto_create_subnetworks = false
-}
-
 resource "google_tpu_v2_vm" "tpu" {
   provider = google-beta
   count = 8

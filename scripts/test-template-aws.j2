@@ -217,12 +217,8 @@ steps:
       queue: intel-gpu
     command: bash .buildkite/run-xpu-test.sh
 
-  - block: "Run TPU tests"
-    depends_on: ~
-    key: block-tpu-test
-
   - label: "TPU Test"
-    depends_on: block-tpu-test
+    depends_on: ~
     agents:
       queue: tpu
     command: if [[ -f ".buildkite/run-tpu-test.sh" ]]; then bash .buildkite/run-tpu-test.sh; fi 

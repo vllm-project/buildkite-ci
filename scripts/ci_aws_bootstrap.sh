@@ -50,6 +50,7 @@ patterns=(
     "CMakeLists.txt"
     "requirements*"
     "setup.py"
+    "csrc/"
 )
 for file in $file_diff; do
     for pattern in "${patterns[@]}"; do

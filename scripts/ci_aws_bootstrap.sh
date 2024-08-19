@@ -45,7 +45,7 @@ if [[ $BUILDKITE_BRANCH == "main" ]]; then
 fi
 
 patterns=(
-    ".buildkite/"
+    ".buildkite/test-pipeline"
     "Dockerfile"
     "CMakeLists.txt"
     "requirements*"

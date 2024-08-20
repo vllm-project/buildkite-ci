@@ -111,6 +111,7 @@ steps:
             - VLLM_USAGE_SOURCE=ci-test
             - HF_HOME={{ hf_home }}
             - HF_TOKEN
+            - BUILDKITE_ANALYTICS_TOKEN
             {% if step.label == "Speculative decoding tests" %}
             - VLLM_ATTENTION_BACKEND=XFORMERS
             {% endif %}

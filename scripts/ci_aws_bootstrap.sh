@@ -12,7 +12,9 @@ upload_pipeline() {
     curl -sSfL https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-installer.sh | sh
     source /var/lib/buildkite-agent/.cargo/env
     if [ $BUILDKITE_PIPELINE_SLUG == "fastcheck" ]; then
-        curl -o .buildkite/test-template-fastcheck.j2 https://raw.githubusercontent.com/vllm-project/buildkite-ci/main/scripts/test-template-fastcheck.j2
+        if [ ! -e ".buildkite/test-template-fastcheck.j2" ]; then
+            curl -o .buildkite/test-template-fastcheck.j2 https://raw.githubusercontent.com/vllm-project/buildkite-ci/main/scripts/test-template-fastcheck.j2
+        fi
         cd .buildkite && minijinja-cli test-template-fastcheck.j2 test-pipeline.yaml > pipeline.yml
         cat pipeline.yml
         buildkite-agent pipeline upload pipeline.yml

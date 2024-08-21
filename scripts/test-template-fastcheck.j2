@@ -20,8 +20,12 @@ steps:
         - exit_status: -10  # Agent was lost
           limit: 5
 
-  - label: "Neuron Test"
+  - block: Run Neuron Test
     depends_on: ~
+    key: run-neuron-test
+    
+  - label: "Neuron Test"
+    depends_on: run-neuron-test
     agents:
       queue: neuron
     command: bash .buildkite/run-neuron-test.sh

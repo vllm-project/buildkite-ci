@@ -199,8 +199,12 @@ steps:
     {% endif %}
     {% endfor %}
 
-  - label: "Neuron Test"
+  - block: Run Neuron Test
     depends_on: ~
+    key: run-neuron-test
+  
+  - label: "Neuron Test"
+    depends_on: run-neuron-test
     agents:
       queue: neuron
     command: bash .buildkite/run-neuron-test.sh

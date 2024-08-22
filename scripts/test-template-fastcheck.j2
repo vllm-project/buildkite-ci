@@ -20,8 +20,12 @@ steps:
         - exit_status: -10  # Agent was lost
           limit: 5
 
-  - label: "Neuron Test"
+  - block: Run Neuron Test
     depends_on: ~
+    key: run-neuron-test
+    
+  - label: "Neuron Test"
+    depends_on: run-neuron-test
     agents:
       queue: neuron
     command: bash .buildkite/run-neuron-test.sh
@@ -115,7 +119,7 @@ steps:
           {% if step.label == "Benchmarks" %}
           mount-buildkite-agent: true
           {% endif %}
-          command: ["bash", "-c", "(command nvidia-smi || true) && cd {{ (step.working_dir or default_working_dir) | safe  }} && {{ step.command  or (step.commands | join(' && ')) | safe }}"]
+          command: ["bash", "-c", "(command nvidia-smi || true) && export VLLM_LOGGING_LEVEL=DEBUG && cd {{ (step.working_dir or default_working_dir) | safe  }} && {{ step.command  or (step.commands | join(' && ')) | safe }}"]
           environment:
             - VLLM_USAGE_SOURCE=ci-test
             - HF_HOME={{ hf_home }}
@@ -223,3 +227,9 @@ steps:
         soft_fail: true
     {% endif %}
     {% endfor %}
+    
+  - label: "TPU Test"
+    depends_on: ~
+    agents:
+      queue: tpu
+    command: if [[ -f ".buildkite/run-tpu-test.sh" ]]; then bash .buildkite/run-tpu-test.sh; fi 

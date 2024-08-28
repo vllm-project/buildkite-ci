@@ -160,12 +160,16 @@ steps:
     {% endif %}
   {% endif %}
   {% endfor %}
+
+  - block: "Run AMD tests"
+    depends_on: ~
+    key: block-amd-tests
   
   - group: "AMD Tests"
-    depends_on: ~
+    depends_on: block-amd-tests
     steps:
       - label: "AMD: :docker: build image"
-        depends_on: ~
+        depends_on: block-amd-tests
         commands:
           - "docker build --build-arg max_jobs=16 --tag {{ docker_image_amd }} -f Dockerfile.rocm --progress plain ."
           - "docker push {{ docker_image_amd }}"

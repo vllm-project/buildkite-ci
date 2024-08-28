@@ -227,9 +227,13 @@ steps:
         soft_fail: true
     {% endif %}
     {% endfor %}
-    
-  - label: "TPU Test"
+
+  - block: "Run TPU test"
     depends_on: ~
+    key: block-tpu-test
+
+  - label: "TPU Test"
+    depends_on: block-tpu-test
     agents:
       queue: tpu
     command: if [[ -f ".buildkite/run-tpu-test.sh" ]]; then bash .buildkite/run-tpu-test.sh; fi 

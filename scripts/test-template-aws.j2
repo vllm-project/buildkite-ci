@@ -26,9 +26,9 @@ steps:
     retry:
       automatic:
         - exit_status: -1  # Agent was lost
-          limit: 5
+          limit: 2
         - exit_status: -10  # Agent was lost
-          limit: 5
+          limit: 2
   
   {% for step in steps %}
   {% if step.fast_check_only != true %}
@@ -90,9 +90,9 @@ steps:
     retry:
       automatic:
         - exit_status: -1  # Agent was lost
-          limit: 2
+          limit: 1
         - exit_status: -10  # Agent was lost
-          limit: 2
+          limit: 1
     {% if step.num_nodes < 2 %}
     plugins:
       {% if step.gpu != "a100" %}
@@ -182,9 +182,9 @@ steps:
         retry:
           automatic:
             - exit_status: -1  # Agent was lost
-              limit: 5
+              limit: 2
             - exit_status: -10  # Agent was lost
-              limit: 5
+              limit: 2
         agents:
           queue: amd-cpu
 
@@ -226,12 +226,10 @@ steps:
       queue: intel-gpu
     command: bash .buildkite/run-xpu-test.sh
 
-  - block: "Run TPU test"
-    depends_on: ~
-    key: block-tpu-test
-
   - label: "TPU Test"
-    depends_on: block-tpu-test
+    depends_on: ~
     agents:
       queue: tpu
-    command: if [[ -f ".buildkite/run-tpu-test.sh" ]]; then bash .buildkite/run-tpu-test.sh; fi 
+    commands: 
+    - if [[ -f ".buildkite/run-tpu-test.sh" ]]; then bash .buildkite/run-tpu-test.sh; fi 
+    - yes | docker system prune -a

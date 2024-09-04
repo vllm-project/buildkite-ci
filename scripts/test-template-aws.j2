@@ -222,6 +222,7 @@ steps:
 
   - label: "Intel GPU Test"
     soft_fail: true
+    depends_on: ~
     agents:
       queue: intel-gpu
     command: bash .buildkite/run-xpu-test.sh

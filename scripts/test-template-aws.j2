@@ -160,13 +160,9 @@ steps:
     {% endif %}
   {% endif %}
   {% endfor %}
-
-  - block: "Run AMD tests"
-    depends_on: ~
-    key: block-amd-tests
   
   - group: "AMD Tests"
-    depends_on: block-amd-tests
+    depends_on: ~
     steps:
       - label: "AMD: :docker: build image"
         depends_on: block-amd-tests

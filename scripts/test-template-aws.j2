@@ -165,7 +165,7 @@ steps:
     depends_on: ~
     steps:
       - label: "AMD: :docker: build image"
-        depends_on: block-amd-tests
+        depends_on: ~
         commands:
           - "docker build --build-arg max_jobs=16 --tag {{ docker_image_amd }} -f Dockerfile.rocm --progress plain ."
           - "docker push {{ docker_image_amd }}"

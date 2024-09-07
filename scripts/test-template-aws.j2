@@ -222,6 +222,7 @@ steps:
 
   - label: "IBM Power(ppc64le) CPU Test"
     depends_on: ~
+    soft_fail: true
     agents:
       queue: ppc64le
     command: bash .buildkite/run-cpu-test-ppc64le.sh

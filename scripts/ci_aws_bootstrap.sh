@@ -24,6 +24,7 @@ upload_pipeline() {
         curl -o .buildkite/test-template.j2 https://raw.githubusercontent.com/vllm-project/buildkite-ci/main/scripts/test-template-aws.j2
     fi
     if [ -e ".buildkite/pipeline_generator/pipeline_generator.py" ]; then
+        python -m pip install click pydantic
         python .buildkite/pipeline_generator/pipeline_generator.py --run_all=$RUN_ALL --list_file_diff="$LIST_FILE_DIFF"
         buildkite-agent pipeline upload .buildkite/pipeline.yaml
     fi

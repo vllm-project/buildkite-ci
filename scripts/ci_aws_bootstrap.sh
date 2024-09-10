@@ -27,6 +27,7 @@ upload_pipeline() {
         python -m pip install click pydantic
         python .buildkite/pipeline_generator/pipeline_generator.py --run_all=$RUN_ALL --list_file_diff="$LIST_FILE_DIFF"
         buildkite-agent pipeline upload .buildkite/pipeline.yaml
+        exit 0
     fi
     cd .buildkite
     echo "List file diff: $LIST_FILE_DIFF"

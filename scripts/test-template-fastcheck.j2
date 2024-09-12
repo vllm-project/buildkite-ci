@@ -209,48 +209,6 @@ steps:
   {% endif %}
   {% endfor %}
 
-  - group: "AMD Tests"
-    depends_on: ~
-    steps:
-      - label: "AMD: :docker: build image"
-        depends_on: ~
-        commands:
-          - "docker build --build-arg max_jobs=16 --tag {{ docker_image_amd }} -f Dockerfile.rocm --progress plain ."
-          - "docker push {{ docker_image_amd }}"
-        plugins:
-          - docker-login#v3.0.0:
-              username: rocmshared
-        key: "amd-build"
-        env:
-          DOCKER_BUILDKIT: "1"
-        retry:
-          automatic:
-            - exit_status: -1  # Agent was lost
-              limit: 2
-            - exit_status: -10  # Agent was lost
-              limit: 2
-        agents:
-          queue: amd-cpu
-
-    {% for step in steps %}
-    {% if step.mirror_hardwares and "amd" in step.mirror_hardwares %}
-      - label: "AMD: {{ step.label }}"
-        depends_on: 
-          - "amd-build"
-        agents:
-          queue: amd
-        command: bash .buildkite/run-amd-test.sh "cd {{ (step.working_dir or default_working_dir) | safe  }} ; {{ step.command  or (step.commands | join(" && ")) | safe }}"
-        env:
-          DOCKER_BUILDKIT: "1"
-        priority: 100
-        {% if step.soft_fail or step.label == "Engine Test" %}
-        soft_fail: true
-        {% else %}
-        soft_fail: false
-        {% endif %}
-    {% endif %}
-    {% endfor %}
-
   - label: "TPU Test"
     depends_on: ~
     agents:

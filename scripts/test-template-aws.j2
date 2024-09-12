@@ -220,8 +220,12 @@ steps:
       queue: intel-cpu
     command: bash .buildkite/run-cpu-test.sh
 
-  - label: "IBM Power(ppc64le) CPU Test"
+  - block: "Run IBM Power CPU Test"
+    key: block-ibm-test
     depends_on: ~
+
+  - label: "IBM Power(ppc64le) CPU Test"
+    depends_on: block-ibm-test
     soft_fail: true
     agents:
       queue: ppc64le

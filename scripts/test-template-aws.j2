@@ -214,8 +214,12 @@ steps:
     command: bash .buildkite/run-neuron-test.sh
     soft_fail: false
 
-  - label: "Intel CPU Test"
+  - block: "Run Intel CPU test"
     depends_on: ~
+    key: block-intel-cpu
+
+  - label: "Intel CPU Test"
+    depends_on: block-intel-cpu
     agents:
       queue: intel-cpu
     command: bash .buildkite/run-cpu-test.sh

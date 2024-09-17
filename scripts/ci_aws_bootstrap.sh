@@ -5,7 +5,17 @@ set -euo pipefail
 if [[ -z "${RUN_ALL:-}" ]]; then
     RUN_ALL=0
 fi
-
+export VLLM_BUILDKITE_BRANCH="pipeline_gen"
+generate_pipeline() {
+    python -m pip install click pydantic
+    curl -o .buildkite/pipeline_generator.py https://raw.githubusercontent.com/vllm-project/buildkite-ci/$VLLM_BUILDKITE_BRANCH/scripts/pipeline_generator/pipeline_generator.py
+    curl -o .buildkite/plugin.py https://raw.githubusercontent.com/vllm-project/buildkite-ci/$VLLM_BUILDKITE_BRANCH/scripts/pipeline_generator/plugin.py
+    curl -o .buildkite/step.py https://raw.githubusercontent.com/vllm-project/buildkite-ci/$VLLM_BUILDKITE_BRANCH/scripts/pipeline_generator/step.py
+    curl -o .buildkite/utils.py https://raw.githubusercontent.com/vllm-project/buildkite-ci/$VLLM_BUILDKITE_BRANCH/scripts/pipeline_generator/utils.py
+    python .buildkite/pipeline_generator.py --run_all=$RUN_ALL --list_file_diff="$LIST_FILE_DIFF"
+    buildkite-agent pipeline upload .buildkite/pipeline.yaml
+    exit 0
+}
 upload_pipeline() {
     echo "Uploading pipeline..."
     ls .buildkite || buildkite-agent annotate --style error 'Please merge upstream main branch for buildkite CI'
@@ -74,4 +84,4 @@ LIST_FILE_DIFF=$(get_diff | tr ' ' '|')
 if [[ $BUILDKITE_BRANCH == "main" ]]; then
     LIST_FILE_DIFF=$(get_diff_main | tr ' ' '|')
 fi
-upload_pipeline
+generate_pipeline

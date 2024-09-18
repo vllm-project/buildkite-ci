@@ -13,6 +13,7 @@ generate_pipeline() {
     curl -o .buildkite/step.py https://raw.githubusercontent.com/vllm-project/buildkite-ci/$VLLM_BUILDKITE_BRANCH/scripts/pipeline_generator/step.py
     curl -o .buildkite/utils.py https://raw.githubusercontent.com/vllm-project/buildkite-ci/$VLLM_BUILDKITE_BRANCH/scripts/pipeline_generator/utils.py
     python .buildkite/pipeline_generator.py --run_all=$RUN_ALL --list_file_diff="$LIST_FILE_DIFF"
+    cat .buildkite/pipeline.yaml
     buildkite-agent pipeline upload .buildkite/pipeline.yaml
     exit 0
 }

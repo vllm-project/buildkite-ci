@@ -41,10 +41,11 @@ def get_full_test_command(test_commands: List[str], step_working_dir: str) -> st
     return full_test_command
 
 def get_image_path(repo: Optional[str] = None) -> str:
-    if repo is None:
-        repo = VLLM_ECR_REPO
     """Get path to image of the current commit on specified container registry."""
     commit = os.getenv("BUILDKITE_COMMIT")
+    if repo is None:
+        repo = VLLM_ECR_REPO
+        commit = "caf4e3167eb418a5fa7994b1b12c2543b11684f8"
     return f"{repo}:{commit}"
 
 def get_multi_node_test_command(test_commands: List[str], working_dir: str, num_nodes: int, num_gpus: int, docker_image_path: str) -> str:

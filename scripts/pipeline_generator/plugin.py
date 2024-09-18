@@ -23,7 +23,7 @@ class KubernetesPodSpec(BaseModel):
 class KubernetesPluginConfig(BaseModel):
     pod_spec: KubernetesPodSpec
 
-def get_kubernetes_plugin_config(docker_image_path: str, test_bash_command: List[str]) -> Dict:
+def get_kubernetes_plugin_config(docker_image_path: str, test_bash_command: List[str], num_gpus: int) -> Dict:
     pod_spec = KubernetesPodSpec(
         containers=[{
             "image": docker_image_path, 

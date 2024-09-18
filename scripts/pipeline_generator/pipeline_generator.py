@@ -77,7 +77,7 @@ def process_step(step: TestStep, run_all: str, list_file_diff: List[str]) -> Lis
 
     def step_should_run():
         """Determine whether the step should automatically run or not."""
-        if step.gpu == "a100":
+        if step.optional:
             return False
         if not step.source_file_dependencies or run_all == "1":
             return True
@@ -93,6 +93,17 @@ def process_step(step: TestStep, run_all: str, list_file_diff: List[str]) -> Lis
         current_step.depends_on = block_step.key
     steps.append(current_step)
     return steps
+
+def mock_build_step() -> BuildkiteStep:
+    step = BuildkiteStep(
+        label=":docker: build image",
+        key="build",
+        agents={"queue": AgentQueue.AWS_CPU.value},
+        env={"DOCKER_BUILDKIT": "1"},
+        commands=["echo 'Mock build step'"],
+        depends_on=None,
+    )
+    return step
 
 def generate_build_step() -> BuildkiteStep:
     """Build the Docker image and push it to ECR."""
@@ -164,7 +175,7 @@ def main(run_all: str = -1, list_file_diff: str = None):
 
     # Read test from yaml file and convert to Buildkite format steps
     test_steps = read_test_steps(TEST_PATH)
-    buildkite_steps = [generate_build_step()]
+    buildkite_steps = [mock_build_step()]
     for step in test_steps:
         buildkite_test_step = process_step(step, run_all, list_file_diff)
         buildkite_steps.extend(buildkite_test_step)

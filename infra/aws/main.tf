@@ -52,7 +52,8 @@ locals {
     RootVolumeSize                        = 512   # Gb
     EnableDockerUserNamespaceRemap        = false # Turn off remap so we can run dind
     BuildkiteAgentTimestampLines          = true
-    BuildkiteTerminateInstanceAfterJob    = true
+    BuildkiteTerminateInstanceAfterJob    = false
+    ScaleInIdlePeriod                     = 300
   }
 
   queues_parameters = {
@@ -89,7 +90,7 @@ locals {
     gpu-1-queue = {
       BuildkiteQueue          = "gpu_1_queue" # Queue for jobs running on 1 GPU
       InstanceTypes           = "g6.4xlarge"  # 1 Nvidia L4 GPU and 64GB memory.
-      MaxSize                 = 40
+      MaxSize                 = 64
       ECRAccessPolicy         = "readonly"
       InstanceOperatingSystem = "linux"
       OnDemandPercentage      = 100
@@ -99,7 +100,7 @@ locals {
     gpu-4-queue = {
       BuildkiteQueue          = "gpu_4_queue" # Queue for jobs running on 4 GPUs
       InstanceTypes           = "g6.12xlarge" # 4 Nvidia L4 GPUs and 192GB memory.
-      MaxSize                 = 3
+      MaxSize                 = 12
       ECRAccessPolicy         = "readonly"
       InstanceOperatingSystem = "linux"
       OnDemandPercentage      = 100
@@ -174,7 +175,8 @@ resource "aws_iam_policy" "bk_stack_secrets_access" {
       Action = ["secretsmanager:GetSecretValue"],
       Effect : "Allow",
       Resource = [
-        aws_secretsmanager_secret.ci_hf_token.arn
+        aws_secretsmanager_secret.ci_hf_token.arn,
+        aws_secretsmanager_secret.bk_analytics_token.arn
       ]
     }]
   })

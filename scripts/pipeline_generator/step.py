@@ -48,5 +48,6 @@ def get_step_key(step_label: str) -> str:
 
     return step_key
 
+
 def get_block_step(step_label: str) -> BuildkiteBlockStep:
     return BuildkiteBlockStep(block=f"Run {step_label}", key=f"block-{get_step_key(step_label)}")

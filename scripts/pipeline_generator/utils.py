@@ -45,7 +45,6 @@ def get_image_path(repo: Optional[str] = None) -> str:
         repo = VLLM_ECR_REPO
     """Get path to image of the current commit on specified container registry."""
     commit = os.getenv("BUILDKITE_COMMIT")
-    commit = "caf4e3167eb418a5fa7994b1b12c2543b11684f8"
     return f"{repo}:{commit}"
 
 def get_multi_node_test_command(test_commands: List[str], working_dir: str, num_nodes: int, num_gpus: int, docker_image_path: str) -> str:

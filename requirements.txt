@@ -1,0 +1,2 @@
+click==8.1.7
+pydantic==2.9.2

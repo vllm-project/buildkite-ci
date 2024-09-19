@@ -19,7 +19,6 @@ from utils import (
     VLLM_ECR_REPO,
     get_agent_queue,
     get_full_test_command,
-    get_image_path,
     get_multi_node_test_command,
 )
 from step import (
@@ -76,7 +75,7 @@ class PipelineGenerator:
                 step.working_dir, 
                 step.num_nodes, 
                 step.num_gpus, 
-                get_image_path()
+                f"{VLLM_ECR_REPO}:{self.commit}"
             )
             current_step.plugins = None
 

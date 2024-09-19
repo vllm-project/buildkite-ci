@@ -1,8 +1,9 @@
 import pytest
 import sys
-from typing import List
+
 
 from scripts.pipeline_generator.step import get_step_key, get_block_step, BuildkiteBlockStep
+
 
 @pytest.mark.parametrize(
     ("step_label", "expected_result"),
@@ -16,6 +17,7 @@ from scripts.pipeline_generator.step import get_step_key, get_block_step, Buildk
 def test_get_step_key(step_label: str, expected_result: str):
     assert get_step_key(step_label) == expected_result
 
+
 @pytest.mark.parametrize(
     ("step_label", "expected_result"),
     [
@@ -27,6 +29,7 @@ def test_get_step_key(step_label: str, expected_result: str):
 )
 def test_get_block_step(step_label: str, expected_result: BuildkiteBlockStep):
     assert get_block_step(step_label) == expected_result
+
 
 if __name__ == "__main__":
     sys.exit(pytest.main(["-v", __file__]))

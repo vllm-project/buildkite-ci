@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
-from utils import HF_HOME   
+from utils import HF_HOME
 
 DOCKER_PLUGIN_NAME = "docker#v5.2.0"
 KUBERNETES_PLUGIN_NAME = "kubernetes"
@@ -13,13 +13,13 @@ class DockerPluginConfig(BaseModel):
     mount_buildkite_agent: Optional[bool] = Field(default=False, alias="mount-buildkite-agent")
     command: List[str] = Field(default_factory=list)
     environment: List[str] = [
-        f"HF_HOME={HF_HOME}", 
-        "VLLM_USAGE_SOURCE=ci-test", 
-        "HF_TOKEN", 
+        f"HF_HOME={HF_HOME}",
+        "VLLM_USAGE_SOURCE=ci-test",
+        "HF_TOKEN",
         "BUILDKITE_ANALYTICS_TOKEN"
     ]
     volumes: List[str] = [
-        "/dev/shm:/dev/shm", 
+        "/dev/shm:/dev/shm",
         f"{HF_HOME}:{HF_HOME}"
     ]
 
@@ -54,19 +54,13 @@ class KubernetesPodSpec(BaseModel):
     containers: List[KubernetesPodContainerConfig]
     priority_class_name: str = Field(default="ci", alias="priorityClassName")
     node_selector: Dict[str, Any] = Field(
-        default={"nvidia.com/gpu.product": "NVIDIA-A100-SXM4-80GB"}, 
+        default={"nvidia.com/gpu.product": "NVIDIA-A100-SXM4-80GB"},
         alias="nodeSelector"
     )
     volumes: List[Dict[str, Any]] = Field(
         default=[
-            {
-                "name": "devshm", 
-                "emptyDir": {"medium": "Memory"}
-            }, 
-            {
-                "name": "hf-cache", 
-                "hostPath": {"path": HF_HOME, "type": "Directory"}
-            }
+            {"name": "devshm", "emptyDir": {"medium": "Memory"}},
+            {"name": "hf-cache", "hostPath": {"path": HF_HOME, "type": "Directory"}}
         ]
     )
 
@@ -77,8 +71,8 @@ def get_kubernetes_plugin_config(docker_image_path: str, test_bash_command: List
     pod_spec = KubernetesPodSpec(
         containers=[
             KubernetesPodContainerConfig(
-                image=docker_image_path, 
-                command=[" ".join(test_bash_command)], 
+                image=docker_image_path,
+                command=[" ".join(test_bash_command)],
                 resources={"limits": {"nvidia.com/gpu": num_gpus}}
             )
         ]
@@ -87,7 +81,7 @@ def get_kubernetes_plugin_config(docker_image_path: str, test_bash_command: List
 
 def get_docker_plugin_config(docker_image_path: str, test_bash_command: List[str], no_gpu: bool) -> Dict:
     docker_plugin_config = DockerPluginConfig(
-        image=docker_image_path, 
+        image=docker_image_path,
         command=test_bash_command
     )
     if no_gpu:

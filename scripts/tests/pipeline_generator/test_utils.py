@@ -1,4 +1,5 @@
 import pytest
+import sys
 from typing import List
 
 from scripts.pipeline_generator.utils import (
@@ -8,6 +9,7 @@ from scripts.pipeline_generator.utils import (
     AgentQueue,
     MULTI_NODE_TEST_SCRIPT,
 )
+
 
 @pytest.mark.parametrize(
     ("no_gpu", "gpu_type", "num_gpus", "expected_result"),
@@ -21,6 +23,7 @@ from scripts.pipeline_generator.utils import (
 def test_get_agent_queue(no_gpu: bool, gpu_type: str, num_gpus: int, expected_result: AgentQueue):
     assert get_agent_queue(no_gpu, gpu_type, num_gpus) == expected_result
 
+
 @pytest.mark.parametrize(
     ("test_commands", "step_working_dir", "expected_result"),
     [
@@ -32,9 +35,14 @@ def test_get_agent_queue(no_gpu: bool, gpu_type: str, num_gpus: int, expected_re
 def test_get_full_test_command(test_commands: List[str], step_working_dir: str, expected_result: str):
     assert get_full_test_command(test_commands, step_working_dir) == expected_result
 
+
 def test_get_multi_node_test_command():
     test_commands = [
-        "distributed/test_same_node.py; pytest -v -s distributed/test_multi_node_assignment.py; pytest -v -s distributed/test_pipeline_parallel.py",
+        (
+            "distributed/test_same_node.py;"
+            "pytest -v -s distributed/test_multi_node_assignment.py;"
+            "pytest -v -s distributed/test_pipeline_parallel.py"
+        ),
         "distributed/test_same_node.py",
     ]
     working_dir = "/vllm-workspace/tests"
@@ -52,6 +60,7 @@ def test_get_multi_node_test_command():
     ]
     expected_result = " ".join(map(str, expected_multi_node_command))
     assert get_multi_node_test_command(test_commands, working_dir, num_nodes, num_gpus, docker_image_path) == expected_result
+
 
 if __name__ == "__main__":
     sys.exit(pytest.main(["-v", __file__]))

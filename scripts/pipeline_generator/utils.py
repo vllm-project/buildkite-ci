@@ -39,8 +39,8 @@ def get_agent_queue(no_gpu: Optional[bool], gpu_type: Optional[str], num_gpus: O
 def get_full_test_command(test_commands: List[str], step_working_dir: str) -> str:
     """Convert test commands into one-line command with the right directory."""
     working_dir = step_working_dir or DEFAULT_WORKING_DIR
-    test_commands_str = "; ".join(test_commands)
-    return f"cd {working_dir}; {test_commands_str}"
+    test_commands_str = ";\n".join(test_commands)
+    return f"cd {working_dir};\n{test_commands_str}"
 
 
 def get_multi_node_test_command(

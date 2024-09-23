@@ -3,20 +3,20 @@ from typing import List, Dict, Any, Optional
 
 from .utils import AgentQueue
 
+BUILD_STEP_KEY = "build"
 
 class BuildkiteBlockStep(BaseModel):
     """This class represents a block step in Buildkite format."""
     block: str
-    depends_on: Optional[str] = "build"
+    depends_on: Optional[str] = BUILD_STEP_KEY
     key: str
 
 
 def get_step_key(step_label: str) -> str:
-    step_label = step_label.replace(", ", ",")
     step_key = ""
-    skip_chars = "()%"
+    skip_chars = "()% "
     for char in step_label.lower():
-        if char in ", ":
+        if char in ", " and step_key[-1] != "-":
             step_key += "-"
         elif char not in skip_chars:
             step_key += char

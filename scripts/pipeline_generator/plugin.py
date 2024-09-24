@@ -7,6 +7,11 @@ DOCKER_PLUGIN_NAME = "docker#v5.2.0"
 KUBERNETES_PLUGIN_NAME = "kubernetes"
 
 class DockerPluginConfig(BaseModel):
+    """
+    Configuration for Docker plugin running in a Buildkite step.
+    The specification is based on:
+    https://github.com/buildkite-plugins/docker-buildkite-plugin?tab=readme-ov-file#configuration
+    """
     image: str = ""
     always_pull: bool = Field(default=True, alias="always-pull")
     propagate_environment: bool = Field(default=True, alias="propagate-environment")
@@ -25,6 +30,9 @@ class DockerPluginConfig(BaseModel):
     ]
 
 class KubernetesPodContainerConfig(BaseModel):
+    """
+    Configuration for a container running in a Kubernetes pod.
+    """
     image: str
     command: List[str]
     resources: Dict[str, Dict[str, int]]
@@ -52,6 +60,9 @@ class KubernetesPodContainerConfig(BaseModel):
     )
 
 class KubernetesPodSpec(BaseModel):
+    """
+    Configuration for a Kubernetes pod running in a Buildkite step.
+    """
     containers: List[KubernetesPodContainerConfig]
     priority_class_name: str = Field(default="ci", alias="priorityClassName")
     node_selector: Dict[str, Any] = Field(
@@ -66,13 +77,16 @@ class KubernetesPodSpec(BaseModel):
     )
 
 class KubernetesPluginConfig(BaseModel):
+    """
+    Configuration for Kubernetes plugin running in a Buildkite step.
+    """
     pod_spec: KubernetesPodSpec = Field(alias="podSpec")
 
-def get_kubernetes_plugin_config(docker_image_path: str, test_bash_command: List[str], num_gpus: int) -> Dict:
+def get_kubernetes_plugin_config(container_image: str, test_bash_command: List[str], num_gpus: int) -> Dict:
     pod_spec = KubernetesPodSpec(
         containers=[
             KubernetesPodContainerConfig(
-                image=docker_image_path,
+                image=container_image,
                 command=[" ".join(test_bash_command)],
                 resources={"limits": {"nvidia.com/gpu": num_gpus}}
             )

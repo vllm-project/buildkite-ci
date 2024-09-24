@@ -75,6 +75,7 @@ resource "google_tpu_v2_vm" "tpu" {
       sudo -u buildkite-agent gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
       sudo sed -i "s/xxx/${var.buildkite_agent_token}/g" /etc/buildkite-agent/buildkite-agent.cfg
+      sudo sed -i 's/name="%hostname-%spawn"/name="vllm-tpu-${count.index}"/' /etc/buildkite-agent/buildkite-agent.cfg
       echo 'tags="queue=tpu"' | sudo tee -a /etc/buildkite-agent/buildkite-agent.cfg
       echo 'HF_TOKEN=${var.huggingface_token}' | sudo tee -a /etc/environment
 

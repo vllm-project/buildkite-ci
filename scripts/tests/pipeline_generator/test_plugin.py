@@ -59,7 +59,7 @@ def test_get_kubernetes_plugin_config():
     [
         (
             "test_image:latest",
-            ["bash", "-c", "echo A", "pytest -v -s a.py"],
+            ["bash", "-c", "echo A;\npytest -v -s a.py"],
             False,
             {
                 DOCKER_PLUGIN_NAME: {
@@ -67,7 +67,7 @@ def test_get_kubernetes_plugin_config():
                     "always-pull": True,
                     "propagate-environment": True,
                     "gpus": "all",
-                    "command": ["bash", "-c", "echo A", "pytest -v -s a.py"],
+                    "command": ["bash", "-c", "echo A;\npytest -v -s a.py"],
                     "environment": [
                         "HF_HOME=/root/.cache/huggingface",
                         "VLLM_USAGE_SOURCE=ci-test",
@@ -84,14 +84,14 @@ def test_get_kubernetes_plugin_config():
         ),
         (
             "cpu_image:latest",
-            ["bash", "-c", "echo B", "pytest -v -s b.py"],
+            ["bash", "-c", "echo B;\npytest -v -s b.py"],
             True,
             {
                 DOCKER_PLUGIN_NAME: {
                     "image": "cpu_image:latest",
                     "always-pull": True,
                     "propagate-environment": True,
-                    "command": ["bash", "-c", "echo B", "pytest -v -s b.py"],
+                    "command": ["bash", "-c", "echo B;\npytest -v -s b.py"],
                     "environment": [
                         "HF_HOME=/root/.cache/huggingface",
                         "VLLM_USAGE_SOURCE=ci-test",

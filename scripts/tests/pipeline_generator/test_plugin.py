@@ -1,13 +1,13 @@
 import pytest
 import sys
 
-from unittest.mock import patch
 from scripts.pipeline_generator.plugin import (
     get_kubernetes_plugin_config,
     get_docker_plugin_config,
     DOCKER_PLUGIN_NAME,
     KUBERNETES_PLUGIN_NAME,
 )
+
 
 def test_get_kubernetes_plugin_config():
     docker_image_path = "test_image:latest"
@@ -50,7 +50,7 @@ def test_get_kubernetes_plugin_config():
             }
         }
     }
-    
+
     assert get_kubernetes_plugin_config(docker_image_path, test_bash_command, num_gpus) == expected_config
 
 

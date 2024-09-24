@@ -6,6 +6,7 @@ from .utils import HF_HOME
 DOCKER_PLUGIN_NAME = "docker#v5.2.0"
 KUBERNETES_PLUGIN_NAME = "kubernetes"
 
+
 class DockerPluginConfig(BaseModel):
     """
     Configuration for Docker plugin running in a Buildkite step.
@@ -28,6 +29,7 @@ class DockerPluginConfig(BaseModel):
         "/dev/shm:/dev/shm",
         f"{HF_HOME}:{HF_HOME}"
     ]
+
 
 class KubernetesPodContainerConfig(BaseModel):
     """
@@ -59,6 +61,7 @@ class KubernetesPodContainerConfig(BaseModel):
         ],
     )
 
+
 class KubernetesPodSpec(BaseModel):
     """
     Configuration for a Kubernetes pod running in a Buildkite step.
@@ -76,11 +79,13 @@ class KubernetesPodSpec(BaseModel):
         ]
     )
 
+
 class KubernetesPluginConfig(BaseModel):
     """
     Configuration for Kubernetes plugin running in a Buildkite step.
     """
     pod_spec: KubernetesPodSpec = Field(alias="podSpec")
+
 
 def get_kubernetes_plugin_config(container_image: str, test_bash_command: List[str], num_gpus: int) -> Dict:
     pod_spec = KubernetesPodSpec(
@@ -93,6 +98,7 @@ def get_kubernetes_plugin_config(container_image: str, test_bash_command: List[s
         ]
     )
     return {KUBERNETES_PLUGIN_NAME: KubernetesPluginConfig(podSpec=pod_spec).dict(by_alias=True)}
+
 
 def get_docker_plugin_config(docker_image_path: str, test_bash_command: List[str], no_gpu: bool) -> Dict:
     docker_plugin_config = DockerPluginConfig(

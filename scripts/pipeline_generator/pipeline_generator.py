@@ -3,11 +3,11 @@ import click
 from typing import List, Dict, Union
 import os
 
-from .plugin import (
+from plugin import (
     get_kubernetes_plugin_config,
     get_docker_plugin_config,
 )
-from .utils import (
+from utils import (
     AgentQueue,
     AMD_REPO,
     A100_GPU,
@@ -21,7 +21,7 @@ from .utils import (
     get_full_test_command,
     get_multi_node_test_command,
 )
-from .step import (
+from step import (
     TestStep, 
     BuildkiteStep, 
     BuildkiteBlockStep, 

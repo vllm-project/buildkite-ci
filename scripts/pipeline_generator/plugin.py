@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 
-from .utils import HF_HOME
+from utils import HF_HOME
 
 DOCKER_PLUGIN_NAME = "docker#v5.2.0"
 KUBERNETES_PLUGIN_NAME = "kubernetes"

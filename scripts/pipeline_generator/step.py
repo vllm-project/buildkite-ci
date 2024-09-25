@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 
-from .utils import AgentQueue
+from utils import AgentQueue
 
 BUILD_STEP_KEY = "build"
 

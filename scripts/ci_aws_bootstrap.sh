@@ -3,16 +3,16 @@
 set -euo pipefail
 
 RUN_ALL=${RUN_ALL:-0}
-VLLM_BUILDKITE_BRANCH=${VLLM_BUILDKITE_BRANCH:-main}
+VLLM_CI_BRANCH=${VLLM_CI_BRANCH:-main}
 
 generate_pipeline() {
     python -m pip install click pydantic
     
     # Download necessary files
     echo "Downloading pipeline generator scripts..."
-    echo $VLLM_BUILDKITE_BRANCH
+    echo $VLLM_CI_BRANCH
     for FILE in pipeline_generator.py plugin.py step.py utils.py; do
-        curl -o ".buildkite/$FILE" "https://raw.githubusercontent.com/vllm-project/buildkite-ci/$VLLM_BUILDKITE_BRANCH/scripts/pipeline_generator/$FILE"
+        curl -o ".buildkite/$FILE" "https://raw.githubusercontent.com/vllm-project/buildkite-ci/$VLLM_CI_BRANCH/scripts/pipeline_generator/$FILE"
     done
     
     # Generate and upload pipeline

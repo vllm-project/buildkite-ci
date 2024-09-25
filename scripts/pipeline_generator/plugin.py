@@ -103,7 +103,7 @@ def get_kubernetes_plugin_config(container_image: str, test_bash_command: List[s
 def get_docker_plugin_config(docker_image_path: str, test_bash_command: List[str], no_gpu: bool) -> Dict:
     docker_plugin_config = DockerPluginConfig(
         image=docker_image_path,
-        command=[" ".join(test_bash_command)]
+        command=test_bash_command
     )
     if no_gpu:
         docker_plugin_config.gpus = None

@@ -126,7 +126,7 @@ class PipelineGenerator:
         return BuildkiteStep(
             label=step.label, 
             key=get_step_key(step.label), 
-            parallelism=step.parallelism, 
+            parallelism=step.parallelism,
             soft_fail=step.soft_fail, 
             plugins=[self.get_plugin_config(step)],
             agents={"queue": get_agent_queue(step.no_gpu, step.gpu, step.num_gpus).value}
@@ -147,6 +147,14 @@ class PipelineGenerator:
             "aws ecr-public get-login-password --region us-east-1 | "
             f"docker login --username AWS --password-stdin {VLLM_ECR_URL}"
         )
+        image_check_command = f"""#!/bin/bash
+if [[ -z $(docker manifest inspect {docker_image}) ]]; then
+  echo "Image not found, proceeding with build..."
+else
+  echo "Image found"
+  exit 0
+fi
+"""
         docker_build_command = (
             f"docker build "
             f"--build-arg max_jobs=64 "
@@ -157,7 +165,7 @@ class PipelineGenerator:
             f"--progress plain ."
         )
         docker_push_command = f"docker push {docker_image}"
-        return [ecr_login_command, docker_build_command, docker_push_command]
+        return [ecr_login_command, image_check_command, docker_build_command, docker_push_command]
 
     def _process_external_hardware_steps(self) -> List[Union[BuildkiteStep, BuildkiteBlockStep]]:
         with open(EXTERNAL_HARDWARE_TEST_PATH, "r") as f:

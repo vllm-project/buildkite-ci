@@ -10,7 +10,7 @@ generate_pipeline() {
     
     # Download necessary files
     echo "Downloading pipeline generator scripts..."
-    echo $VLLM_CI_BRANCH
+    echo "VLLM CI Branch: $VLLM_CI_BRANCH"
     for FILE in pipeline_generator.py plugin.py step.py utils.py; do
         curl -o ".buildkite/$FILE" "https://raw.githubusercontent.com/vllm-project/buildkite-ci/$VLLM_CI_BRANCH/scripts/pipeline_generator/$FILE"
     done

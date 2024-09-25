@@ -107,7 +107,6 @@ class PipelineGenerator:
             "-c",
             get_full_test_command(test_step_commands, step.working_dir)
         ]
-        test_bash_command[-1] = f"'{test_bash_command[-1]}'"
         container_image = f"{VLLM_ECR_REPO}:{self.commit}"
 
         if step.gpu == A100_GPU:

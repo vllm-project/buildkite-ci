@@ -92,7 +92,7 @@ def get_kubernetes_plugin_config(container_image: str, test_bash_command: List[s
         containers=[
             KubernetesPodContainerConfig(
                 image=container_image,
-                command=[" ".join(test_bash_command)],
+                command=test_bash_command,
                 resources={"limits": {"nvidia.com/gpu": num_gpus}}
             )
         ]

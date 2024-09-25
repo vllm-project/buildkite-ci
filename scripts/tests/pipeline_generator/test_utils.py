@@ -27,9 +27,9 @@ def test_get_agent_queue(no_gpu: bool, gpu_type: str, num_gpus: int, expected_re
 @pytest.mark.parametrize(
     ("test_commands", "step_working_dir", "expected_result"),
     [
-        (["echo 'hello'"], None, "cd /vllm-workspace/tests;\necho 'hello'"),
-        (["echo 'hello'"], "/vllm-workspace/tests", "cd /vllm-workspace/tests;\necho 'hello'"),
-        (["echo 'hello1'", "echo 'hello2'"], None, "cd /vllm-workspace/tests;\necho 'hello1';\necho 'hello2'"),
+        (["echo 'hello'"], None, "(command nvidia-smi || true);\nexport VLLM_LOGGING_LEVEL=DEBUG;\nexport VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1;\ncd /vllm-workspace/tests;\necho 'hello'"),
+        (["echo 'hello'"], "/vllm-workspace/tests", "(command nvidia-smi || true);\nexport VLLM_LOGGING_LEVEL=DEBUG;\nexport VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1;\ncd /vllm-workspace/tests;\necho 'hello'"),
+        (["echo 'hello1'", "echo 'hello2'"], None, "(command nvidia-smi || true);\nexport VLLM_LOGGING_LEVEL=DEBUG;\nexport VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1;\ncd /vllm-workspace/tests;\necho 'hello1';\necho 'hello2'"),
     ],
 )
 def test_get_full_test_command(test_commands: List[str], step_working_dir: str, expected_result: str):

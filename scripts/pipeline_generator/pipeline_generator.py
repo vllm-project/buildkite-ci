@@ -3,11 +3,11 @@ import click
 from typing import List, Dict, Union
 import os
 
-from plugin import (
+from .plugin import (
     get_kubernetes_plugin_config,
     get_docker_plugin_config,
 )
-from utils import (
+from .utils import (
     AgentQueue,
     AMD_REPO,
     A100_GPU,
@@ -21,7 +21,7 @@ from utils import (
     get_full_test_command,
     get_multi_node_test_command,
 )
-from step import (
+from .step import (
     TestStep, 
     BuildkiteStep, 
     BuildkiteBlockStep, 
@@ -54,7 +54,7 @@ class PipelineGenerator:
     def process_step(self, step: TestStep) -> List[Union[BuildkiteStep, BuildkiteBlockStep]]:
         """Process test step and return corresponding BuildkiteStep."""
         steps = []
-        current_step = self._create_buildkite_step(step)
+        current_step = self.create_buildkite_step(step)
 
         if step.num_nodes > 1:
             self._configure_multi_node_step(current_step, step)
@@ -86,6 +86,12 @@ class PipelineGenerator:
             commands=build_commands,
             depends_on=None,
         )
+    
+    def write_buildkite_steps(self, buildkite_steps: List[Union[BuildkiteStep, BuildkiteBlockStep]], output_file_path: str) -> None:
+        """Output the buildkite steps to the Buildkite pipeline yaml file."""
+        buildkite_steps_dict = {"steps": [step.dict(exclude_none=True) for step in buildkite_steps]}
+        with open(output_file_path, "w") as f:
+            yaml.dump(buildkite_steps_dict, f, sort_keys=False)
 
     def get_external_hardware_tests(self, test_steps: List[TestStep]) -> List[Union[BuildkiteStep, BuildkiteBlockStep]]:
         """Process the external hardware tests from the yaml file and convert to Buildkite steps."""
@@ -95,28 +101,28 @@ class PipelineGenerator:
 
     def get_plugin_config(self, step: TestStep) -> Dict:
         """Returns the plugin configuration for the step."""
-        test_commands = [step.command] if step.command else step.commands
+        test_step_commands = [step.command] if step.command else step.commands
         test_bash_command = [
             "bash",
             "-c",
-            get_full_test_command(test_commands, step.working_dir)
+            get_full_test_command(test_step_commands, step.working_dir)
         ]
-        docker_image_path = f"{VLLM_ECR_REPO}:{self.commit}"
+        test_bash_command[-1] = f"'{test_bash_command[-1]}'"
+        container_image = f"{VLLM_ECR_REPO}:{self.commit}"
 
         if step.gpu == A100_GPU:
-            test_bash_command[-1] = f"'{test_bash_command[-1]}'"
             return get_kubernetes_plugin_config(
-                docker_image_path,
+                container_image,
                 test_bash_command,
                 step.num_gpus
             )
         return get_docker_plugin_config(
-            docker_image_path,
+            container_image,
             test_bash_command,
             step.no_gpu
         )
 
-    def _create_buildkite_step(self, step: TestStep) -> BuildkiteStep:
+    def create_buildkite_step(self, step: TestStep) -> BuildkiteStep:
         return BuildkiteStep(
             label=step.label, 
             key=get_step_key(step.label), 
@@ -206,10 +212,8 @@ def main(run_all: str = "-1", list_file_diff: str = None):
         *pipeline_generator.get_external_hardware_tests(test_steps)
     ]
 
-    buildkite_steps_dict = {"steps": [step.dict(exclude_none=True) for step in buildkite_steps]}
+    pipeline_generator.write_buildkite_steps(buildkite_steps, PIPELINE_FILE_PATH)
 
-    with open(PIPELINE_FILE_PATH, "w") as f:
-        yaml.dump(buildkite_steps_dict, f, sort_keys=False)
 
 if __name__ == "__main__":
     main()

@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 
-from utils import HF_HOME
+from .utils import HF_HOME
 
 DOCKER_PLUGIN_NAME = "docker#v5.2.0"
 KUBERNETES_PLUGIN_NAME = "kubernetes"
@@ -103,7 +103,7 @@ def get_kubernetes_plugin_config(container_image: str, test_bash_command: List[s
 def get_docker_plugin_config(docker_image_path: str, test_bash_command: List[str], no_gpu: bool) -> Dict:
     docker_plugin_config = DockerPluginConfig(
         image=docker_image_path,
-        command=test_bash_command
+        command=[" ".join(test_bash_command)]
     )
     if no_gpu:
         docker_plugin_config.gpus = None

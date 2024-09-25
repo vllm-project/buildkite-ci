@@ -40,7 +40,15 @@ def get_full_test_command(test_commands: List[str], step_working_dir: str) -> st
     """Convert test commands into one-line command with the right directory."""
     working_dir = step_working_dir or DEFAULT_WORKING_DIR
     test_commands_str = ";\n".join(test_commands)
-    return f"cd {working_dir};\n{test_commands_str}"
+    # Always add these commands before running the tests
+    commands = [
+        "(command nvidia-smi || true)",
+        "export VLLM_LOGGING_LEVEL=DEBUG",
+        "export VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1",
+        f"cd {working_dir}",
+        test_commands_str
+    ]
+    return ";\n".join(commands)
 
 
 def get_multi_node_test_command(

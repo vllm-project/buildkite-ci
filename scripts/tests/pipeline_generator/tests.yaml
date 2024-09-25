@@ -1,0 +1,25 @@
+steps:
+- label: Test 0
+  source_file_dependencies:
+  - dir1/
+  - dir2/file1
+  commands:
+  - pytest -v -s a
+  - pytest -v -s b.py
+- label: Test 1
+  working_dir: "/tests"
+  commands:
+  - pytest -v -s d
+- label: Test 2
+  num_gpus: 2
+  num_nodes: 2
+  commands:
+  - pytest -v -s e && pytest -v -s f
+  - pytest -v -s g
+- label: Test 3
+  working_dir: "/tests"
+  gpu: a100
+  num_gpus: 4
+  optional: true
+  commands:
+  - pytest -v -s d

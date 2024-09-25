@@ -43,6 +43,8 @@ class PipelineGenerator:
 
     def step_should_run(self, step: TestStep) -> bool:
         """Determine whether the step should automatically run or not."""
+        if step.gpu != A100_GPU:
+            return False
         if step.optional:
             return False
         if not step.source_file_dependencies or self.run_all:

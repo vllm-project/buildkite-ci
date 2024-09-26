@@ -13,7 +13,7 @@ A100_GPU = "a100"
 TEST_PATH = "./test-pipeline.yaml"
 EXTERNAL_HARDWARE_TEST_PATH = "./external-tests.yaml"
 PIPELINE_FILE_PATH = "./pipeline.yaml"
-MULTI_NODE_TEST_SCRIPT = "./run-multi-node-test.sh"
+MULTI_NODE_TEST_SCRIPT = "./buildkite/run-multi-node-test.sh"
 
 STEPS_TO_BLOCK = []
 

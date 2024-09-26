@@ -10,10 +10,10 @@ AMD_REPO = "rocm/vllm-ci"
 A100_GPU = "a100"
 
 # File paths
-TEST_PATH = ".buildkite/test-pipeline.yaml"
-EXTERNAL_HARDWARE_TEST_PATH = ".buildkite/external-tests.yaml"
-PIPELINE_FILE_PATH = ".buildkite/pipeline.yaml"
-MULTI_NODE_TEST_SCRIPT = ".buildkite/run-multi-node-test.sh"
+TEST_PATH = "./test-pipeline.yaml"
+EXTERNAL_HARDWARE_TEST_PATH = "./external-tests.yaml"
+PIPELINE_FILE_PATH = "./pipeline.yaml"
+MULTI_NODE_TEST_SCRIPT = "./run-multi-node-test.sh"
 
 STEPS_TO_BLOCK = []
 

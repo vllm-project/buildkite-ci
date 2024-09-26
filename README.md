@@ -1,7 +1,10 @@
-# vLLM's Buildkite Cluster
+# vLLM CI
 
-This repo contains code to bootstrap vLLM's CI cluster running on GCP for Buildkite.
-It contains terraform code to create a GCE instance group, a GKE cluster, and a GAR container registry.
-The GKE cluster is configured to scale to zero with node pools of L4 and 2xL4 nodes.
+This repo contains infrastructure and bootstrap code for vLLM Buildkite pipeline.
 
-The GKE cluster is connected to Buildkite via the [Buildkite Agent Stack for K8s](https://github.com/buildkite/agent-stack-k8s#readme).
+Currently, the CI infrastructure contains the following:
+- Buildkite Elastic CI stack on AWS: see `infra/aws`
+- 8 TPU nodes: see `infra/gcp_old`
+- 1 GKE cluster (currently not in use): see `infra/gcp`
+
+The bootstrap scripts are located in `scripts/` 

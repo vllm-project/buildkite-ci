@@ -1,9 +1,10 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 
 from .utils import AgentQueue
 
 BUILD_STEP_KEY = "build"
+
 
 class TestStep(BaseModel):
     """This class represents a test step defined in the test configuration file."""
@@ -22,6 +23,7 @@ class TestStep(BaseModel):
     command: Optional[str] = None
     commands: Optional[List[str]] = None
 
+
 class BuildkiteStep(BaseModel):
     """This class represents a step in Buildkite format."""
     label: str
@@ -34,6 +36,7 @@ class BuildkiteStep(BaseModel):
     depends_on: Optional[str] = "build"
     env: Optional[Dict[str, str]] = None
     retry: Optional[Dict[str, Any]] = None
+
 
 class BuildkiteBlockStep(BaseModel):
     """This class represents a block step in Buildkite format."""

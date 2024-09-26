@@ -39,6 +39,7 @@ DEFAULT_KUBERNETES_POD_VOLUMES = [
 ]
 DEFAULT_KUBERNETES_NODE_SELECTOR = {"nvidia.com/gpu.product": "NVIDIA-A100-SXM4-80GB"}
 
+
 class DockerPluginConfig(BaseModel):
     """
     Configuration for Docker plugin running in a Buildkite step.

@@ -102,7 +102,6 @@ def test_read_test_steps():
 )
 def test_get_plugin_config(test_step, expected_plugin_config):
     pipeline_generator = get_test_pipeline_generator()
-
     plugin_config = pipeline_generator.get_plugin_config(test_step)
     assert plugin_config == expected_plugin_config
 

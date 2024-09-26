@@ -3,11 +3,11 @@ import click
 from typing import List, Dict, Union
 import os
 
-from plugin import (
+from .plugin import (
     get_kubernetes_plugin_config,
     get_docker_plugin_config,
 )
-from utils import (
+from .utils import (
     AgentQueue,
     AMD_REPO,
     A100_GPU,
@@ -21,7 +21,7 @@ from utils import (
     get_full_test_command,
     get_multi_node_test_command,
 )
-from step import (
+from .step import (
     TestStep, 
     BuildkiteStep, 
     BuildkiteBlockStep, 
@@ -43,8 +43,6 @@ class PipelineGenerator:
 
     def step_should_run(self, step: TestStep) -> bool:
         """Determine whether the step should automatically run or not."""
-        if step.gpu != A100_GPU:
-            return False
         if step.optional:
             return False
         if not step.source_file_dependencies or self.run_all:
@@ -58,9 +56,6 @@ class PipelineGenerator:
         steps = []
         current_step = self.create_buildkite_step(step)
 
-        if step.num_nodes > 1:
-            self._configure_multi_node_step(current_step, step)
-
         if not self.step_should_run(step):
             block_step = get_block_step(step.label)
             steps.append(block_step)
@@ -72,7 +67,7 @@ class PipelineGenerator:
     def generate_build_step(self) -> BuildkiteStep:
         """Build the Docker image and push it to ECR."""
         docker_image = f"{VLLM_ECR_REPO}:{self.commit}"
-        build_commands = self._get_build_commands(docker_image)
+        build_commands = self.get_build_commands(docker_image)
 
         return BuildkiteStep(
             label=":docker: build image", 
@@ -110,7 +105,6 @@ class PipelineGenerator:
             get_full_test_command(test_step_commands, step.working_dir)
         ]
         container_image = f"{VLLM_ECR_REPO}:{self.commit}"
-
         if step.gpu == A100_GPU:
             return get_kubernetes_plugin_config(
                 container_image,
@@ -124,26 +118,30 @@ class PipelineGenerator:
         )
 
     def create_buildkite_step(self, step: TestStep) -> BuildkiteStep:
-        return BuildkiteStep(
+        buildkite_step = BuildkiteStep(
             label=step.label, 
             key=get_step_key(step.label), 
             parallelism=step.parallelism,
-            soft_fail=step.soft_fail, 
+            soft_fail=step.soft_fail,
             plugins=[self.get_plugin_config(step)],
             agents={"queue": get_agent_queue(step.no_gpu, step.gpu, step.num_gpus).value}
         )
+        if step.num_nodes and step.num_nodes > 1:
+            self._configure_multi_node_step(buildkite_step, step)
+        return buildkite_step
 
     def _configure_multi_node_step(self, current_step: BuildkiteStep, step: TestStep):
-        current_step.commands = get_multi_node_test_command(
-            step.commands, 
-            step.working_dir, 
-            step.num_nodes, 
-            step.num_gpus, 
-            f"{VLLM_ECR_REPO}:{self.commit}"
-        )
+        current_step.commands = [get_multi_node_test_command(
+                step.commands, 
+                step.working_dir, 
+                step.num_nodes, 
+                step.num_gpus, 
+                f"{VLLM_ECR_REPO}:{self.commit}"
+            )
+        ]
         current_step.plugins = None
 
-    def _get_build_commands(self, docker_image: str) -> List[str]:
+    def get_build_commands(self, docker_image: str) -> List[str]:
         ecr_login_command = (
             "aws ecr-public get-login-password --region us-east-1 | "
             f"docker login --username AWS --password-stdin {VLLM_ECR_URL}"
@@ -177,6 +175,8 @@ fi
             step["commands"] = [cmd.replace("DOCKER_IMAGE_AMD", amd_docker_image) for cmd in step["commands"]]
             buildkite_step = BuildkiteStep(**step)
             buildkite_step.depends_on = "bootstrap"
+
+            # Add block step if step is in blocklist
             if buildkite_step.key in STEPS_TO_BLOCK:
                 block_step = get_block_step(buildkite_step.label)
                 buildkite_steps.append(block_step)
@@ -185,9 +185,9 @@ fi
         return buildkite_steps
 
     def _mirror_amd_test_steps(self, test_steps: List[TestStep]) -> List[BuildkiteStep]:
-        mirrored_steps = []
+        mirrored_buildkite_steps = []
         for test_step in test_steps:
-            if "amd" in test_step.mirror_hardwares:
+            if test_step.mirror_hardwares and "amd" in test_step.mirror_hardwares:
                 test_commands = [test_step.command] if test_step.command else test_step.commands
                 amd_test_command = [
                     "bash", 
@@ -203,8 +203,8 @@ fi
                     env = {"DOCKER_BUILDKIT": "1"},
                     commands = [" ".join(amd_test_command)],
                 )
-                mirrored_steps.append(mirrored_buildkite_step)
-        return mirrored_steps
+                mirrored_buildkite_steps.append(mirrored_buildkite_step)
+        return mirrored_buildkite_steps
 
 @click.command()
 @click.option("--run_all", type=str)

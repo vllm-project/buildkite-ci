@@ -33,7 +33,7 @@ def get_agent_queue(no_gpu: Optional[bool], gpu_type: Optional[str], num_gpus: O
         return AgentQueue.AWS_SMALL_CPU
     if gpu_type == A100_GPU:
         return AgentQueue.A100
-    return AgentQueue.AWS_1xL4 if num_gpus == 1 else AgentQueue.AWS_4xL4
+    return AgentQueue.AWS_1xL4 if not num_gpus or num_gpus == 1else AgentQueue.AWS_4xL4
 
 
 def get_full_test_command(test_commands: List[str], step_working_dir: str) -> str:

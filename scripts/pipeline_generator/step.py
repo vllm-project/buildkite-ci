@@ -1,23 +1,23 @@
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 
-from utils import AgentQueue
+from .utils import AgentQueue
 
 BUILD_STEP_KEY = "build"
 
 class TestStep(BaseModel):
     """This class represents a test step defined in the test configuration file."""
     label: str
-    fast_check: bool = False
-    mirror_hardwares: List[str] = Field(default_factory=list)
-    gpu: str = ""
-    num_gpus: int = 1
-    num_nodes: int = 1
+    fast_check: Optional[bool] = None
+    mirror_hardwares: Optional[List[str]] = None
+    gpu: Optional[str] = None
+    num_gpus: Optional[int] = None
+    num_nodes: Optional[int] = None
     working_dir: str = "/vllm-workspace/tests"
-    source_file_dependencies: List[str] = Field(default_factory=list)
-    no_gpu: bool = False
-    soft_fail: bool = False
-    parallelism: int = 1
+    source_file_dependencies: Optional[List[str]] = None
+    no_gpu: Optional[bool] = None
+    soft_fail: Optional[bool] = None
+    parallelism: Optional[int] = None
     optional: bool = False
     command: Optional[str] = None
     commands: Optional[List[str]] = None

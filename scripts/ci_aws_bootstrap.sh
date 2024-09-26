@@ -11,14 +11,16 @@ generate_pipeline() {
     # Download necessary files
     echo "Downloading pipeline generator scripts..."
     echo "VLLM CI Branch: $VLLM_CI_BRANCH"
-    for FILE in pipeline_generator.py plugin.py step.py utils.py; do
-        curl -o ".buildkite/$FILE" "https://raw.githubusercontent.com/vllm-project/buildkite-ci/$VLLM_CI_BRANCH/scripts/pipeline_generator/$FILE"
+    mkdir -p .buildkite/pipeline_generator
+    for FILE in pipeline_generator.py plugin.py step.py utils.py __init__.py; do
+        curl -o ".buildkite/pipeline_generator/$FILE" "https://raw.githubusercontent.com/vllm-project/buildkite-ci/$VLLM_CI_BRANCH/scripts/pipeline_generator/$FILE"
     done
     
     # Generate and upload pipeline
-    python .buildkite/pipeline_generator.py --run_all=$RUN_ALL --list_file_diff="$LIST_FILE_DIFF"
-    cat .buildkite/pipeline.yaml
-    buildkite-agent pipeline upload .buildkite/pipeline.yaml
+    cd .buildkite
+    python -m pipeline_generator.pipeline_generator --run_all=$RUN_ALL --list_file_diff="$LIST_FILE_DIFF"
+    cat pipeline.yaml
+    buildkite-agent pipeline upload pipeline.yaml
     exit 0
 }
 

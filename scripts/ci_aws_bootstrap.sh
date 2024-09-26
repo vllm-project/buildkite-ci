@@ -6,11 +6,9 @@ RUN_ALL=${RUN_ALL:-0}
 VLLM_CI_BRANCH=${VLLM_CI_BRANCH:-main}
 
 generate_pipeline() {
-    python -m pip install click pydantic
+    python -m pip install "click==8.1.7" "pydantic==2.9.2"
     
     # Download necessary files
-    echo "Downloading pipeline generator scripts..."
-    echo "VLLM CI Branch: $VLLM_CI_BRANCH"
     mkdir -p .buildkite/pipeline_generator
     for FILE in pipeline_generator.py plugin.py step.py utils.py __init__.py; do
         curl -o ".buildkite/pipeline_generator/$FILE" "https://raw.githubusercontent.com/vllm-project/buildkite-ci/$VLLM_CI_BRANCH/scripts/pipeline_generator/$FILE"
@@ -18,10 +16,9 @@ generate_pipeline() {
     
     # Generate and upload pipeline
     cd .buildkite
-    python -m pipeline_generator.pipeline_generator --run_all=$RUN_ALL --list_file_diff="$LIST_FILE_DIFF"
+    python -m pipeline_generator.pipeline_generator --run_all="$RUN_ALL" --list_file_diff="$LIST_FILE_DIFF"
     cat pipeline.yaml
     buildkite-agent pipeline upload pipeline.yaml
-    exit 0
 }
 
 upload_pipeline() {
@@ -29,7 +26,7 @@ upload_pipeline() {
     ls .buildkite || buildkite-agent annotate --style error 'Please merge upstream main branch for buildkite CI'
     
     # Install minijinja-cli
-    curl -sSfL https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-installer.sh | sh
+    curl -sSfL https://github.com/mitsuhiko/minijinja/releases/download/2.3.1/minijinja-cli-installer.sh | sh
     source /var/lib/buildkite-agent/.cargo/env
     
     if [[ $BUILDKITE_PIPELINE_SLUG == "fastcheck" ]]; then
@@ -40,9 +37,9 @@ upload_pipeline() {
 }
 
 handle_fastcheck() {
-    [ ! -e ".buildkite/test-template-fastcheck.j2" ] && \
+    if [[ ! -e ".buildkite/test-template-fastcheck.j2" ]]; then
         curl -o .buildkite/test-template-fastcheck.j2 https://raw.githubusercontent.com/vllm-project/buildkite-ci/main/scripts/test-template-fastcheck.j2
-    
+    fi
     cd .buildkite && minijinja-cli test-template-fastcheck.j2 test-pipeline.yaml > pipeline.yml
     cat pipeline.yml
     buildkite-agent pipeline upload pipeline.yml
@@ -68,8 +65,8 @@ handle_regular_pipeline() {
 }
 
 get_diff() {
-    git add .
-    git diff --name-only --diff-filter=ACMDR $(git merge-base origin/main HEAD)
+    $(git add .)
+    echo $(git diff --name-only --diff-filter=ACMDR $(git merge-base origin/main HEAD))
 }
 
 get_diff_main() {

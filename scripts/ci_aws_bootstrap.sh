@@ -10,7 +10,7 @@ generate_pipeline() {
 
     # Download necessary files
     mkdir -p .buildkite/pipeline_generator
-    for FILE in pipeline_generator.py plugin.py step.py utils.py __init__.py; do
+    for FILE in pipeline_generator.py pipeline_generator_helper.py plugin.py step.py utils.py __init__.py; do
         curl -o ".buildkite/pipeline_generator/$FILE" "https://raw.githubusercontent.com/vllm-project/buildkite-ci/$VLLM_CI_BRANCH/scripts/pipeline_generator/$FILE"
     done
 

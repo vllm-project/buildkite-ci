@@ -2,6 +2,7 @@ import yaml
 import click
 from typing import List, Dict, Union
 import os
+from pydantic import BaseModel
 
 from .plugin import (
     get_kubernetes_plugin_config,
@@ -28,47 +29,37 @@ from .step import (
     get_block_step,
     get_step_key
 )
+from .pipeline_generator_helper import (
+    step_should_run,
+    get_plugin_config,
+    create_buildkite_step,
+    get_build_commands,
+)
 
+class PipelineGeneratorConfig(BaseModel):
+    run_all: bool
+    list_file_diff: List[str]
+    container_registry: str
+    container_registry_repo: str
+    commit: str
+    test_path: str
+    external_hardware_test_path: str
+    pipeline_file_path: str
+
+    @property
+    def container_image(self) -> str:
+        return f"{self.container_registry}/{self.container_registry_repo}:{self.commit}"
 
 class PipelineGenerator:
-    def __init__(self, run_all: bool, list_file_diff: List[str]):
-        self.run_all = run_all
-        self.list_file_diff = list_file_diff
-        self.commit = os.getenv("BUILDKITE_COMMIT")
-
-    def read_test_steps(self, file_path: str) -> List[TestStep]:
-        """Read test steps from test pipeline yaml and parse them into Step objects."""
-        with open(file_path, "r") as f:
-            content = yaml.safe_load(f)
-        return [TestStep(**step) for step in content["steps"]]
-
-    def step_should_run(self, step: TestStep) -> bool:
-        """Determine whether the step should automatically run or not."""
-        if step.optional:
-            return False
-        if not step.source_file_dependencies or self.run_all:
-            return True
-        return any(source_file in diff_file
-                   for source_file in step.source_file_dependencies
-                   for diff_file in self.list_file_diff)
-
-    def process_step(self, step: TestStep) -> List[Union[BuildkiteStep, BuildkiteBlockStep]]:
-        """Process test step and return corresponding BuildkiteStep."""
-        steps = []
-        current_step = self.create_buildkite_step(step)
-
-        if not self.step_should_run(step):
-            block_step = get_block_step(step.label)
-            steps.append(block_step)
-            current_step.depends_on = block_step.key
-
-        steps.append(current_step)
-        return steps
+    def __init__(
+            self, 
+            config: PipelineGeneratorConfig
+        ):
+        self.config = config
 
     def generate_build_step(self) -> BuildkiteStep:
-        """Build the Docker image and push it to ECR."""
-        docker_image = f"{VLLM_ECR_REPO}:{self.commit}"
-        build_commands = self.get_build_commands(docker_image)
+        """Build the Docker image and push it to container registry."""
+        build_commands = get_build_commands(self.config.container_registry, self.config.commit, self.config.container_image)
 
         return BuildkiteStep(
             label=":docker: build image",
@@ -85,15 +76,24 @@ class PipelineGenerator:
             depends_on=None,
         )
 
-    def write_buildkite_steps(
-            self,
-            buildkite_steps: List[Union[BuildkiteStep, BuildkiteBlockStep]],
-            output_file_path: str
-            ) -> None:
-        """Output the buildkite steps to the Buildkite pipeline yaml file."""
-        buildkite_steps_dict = {"steps": [step.dict(exclude_none=True) for step in buildkite_steps]}
-        with open(output_file_path, "w") as f:
-            yaml.dump(buildkite_steps_dict, f, sort_keys=False)
+    def read_test_steps(self, file_path: str) -> List[TestStep]:
+        """Read test steps from test pipeline yaml and parse them into Step objects."""
+        with open(file_path, "r") as f:
+            content = yaml.safe_load(f)
+        return [TestStep(**step) for step in content["steps"]]
+
+    def convert_test_step_to_buildkite_steps(self, step: TestStep) -> List[Union[BuildkiteStep, BuildkiteBlockStep]]:
+        """Process test step and return corresponding BuildkiteStep."""
+        steps = []
+        current_step = create_buildkite_step(step, self.config.container_image)
+
+        if not step_should_run(step, self.config.run_all, self.config.list_file_diff):
+            block_step = get_block_step(step.label)
+            steps.append(block_step)
+            current_step.depends_on = block_step.key
+
+        steps.append(current_step)
+        return steps
 
     def get_external_hardware_tests(self, test_steps: List[TestStep]) -> List[Union[BuildkiteStep, BuildkiteBlockStep]]:
         """Process the external hardware tests from the yaml file and convert to Buildkite steps."""
@@ -101,81 +101,12 @@ class PipelineGenerator:
         buildkite_steps.extend(self._mirror_amd_test_steps(test_steps))
         return buildkite_steps
 
-    def get_plugin_config(self, step: TestStep) -> Dict:
-        """Returns the plugin configuration for the step."""
-        test_step_commands = [step.command] if step.command else step.commands
-        test_bash_command = [
-            "bash",
-            "-c",
-            get_full_test_command(test_step_commands, step.working_dir)
-        ]
-        container_image = f"{VLLM_ECR_REPO}:{self.commit}"
-        if step.gpu == A100_GPU:
-            return get_kubernetes_plugin_config(
-                container_image,
-                test_bash_command,
-                step.num_gpus
-            )
-        return get_docker_plugin_config(
-            container_image,
-            test_bash_command,
-            step.no_gpu
-        )
-
-    def create_buildkite_step(self, step: TestStep) -> BuildkiteStep:
-        buildkite_step = BuildkiteStep(
-            label=step.label,
-            key=get_step_key(step.label),
-            parallelism=step.parallelism,
-            soft_fail=step.soft_fail,
-            plugins=[self.get_plugin_config(step)],
-            agents={"queue": get_agent_queue(step.no_gpu, step.gpu, step.num_gpus).value}
-        )
-        if step.num_nodes and step.num_nodes > 1:
-            self._configure_multi_node_step(buildkite_step, step)
-        return buildkite_step
-
-    def _configure_multi_node_step(self, current_step: BuildkiteStep, step: TestStep):
-        current_step.commands = [get_multi_node_test_command(
-                step.commands,
-                step.working_dir,
-                step.num_nodes,
-                step.num_gpus,
-                f"{VLLM_ECR_REPO}:{self.commit}"
-            )
-        ]
-        current_step.plugins = None
-
-    def get_build_commands(self, docker_image: str) -> List[str]:
-        ecr_login_command = (
-            "aws ecr-public get-login-password --region us-east-1 | "
-            f"docker login --username AWS --password-stdin {VLLM_ECR_URL}"
-        )
-        image_check_command = f"""#!/bin/bash
-if [[ -z $(docker manifest inspect {docker_image}) ]]; then
-  echo "Image not found, proceeding with build..."
-else
-  echo "Image found"
-  exit 0
-fi
-"""
-        docker_build_command = (
-            f"docker build "
-            f"--build-arg max_jobs=64 "
-            f"--build-arg buildkite_commit={self.commit} "
-            f"--build-arg USE_SCCACHE=1 "
-            f"--tag {docker_image} "
-            f"--target test "
-            f"--progress plain ."
-        )
-        docker_push_command = f"docker push {docker_image}"
-        return [ecr_login_command, image_check_command, docker_build_command, docker_push_command]
 
     def _process_external_hardware_steps(self) -> List[Union[BuildkiteStep, BuildkiteBlockStep]]:
         with open(EXTERNAL_HARDWARE_TEST_PATH, "r") as f:
             content = yaml.safe_load(f)
         buildkite_steps = []
-        amd_docker_image = f"{AMD_REPO}:{self.commit}"
+        amd_docker_image = f"{AMD_REPO}:{self.config.commit}"
         for step in content["steps"]:
             step["commands"] = [cmd.replace("DOCKER_IMAGE_AMD", amd_docker_image) for cmd in step["commands"]]
             buildkite_step = BuildkiteStep(**step)
@@ -211,23 +142,45 @@ fi
                 mirrored_buildkite_steps.append(mirrored_buildkite_step)
         return mirrored_buildkite_steps
 
+    def write_buildkite_steps(
+            self,
+            buildkite_steps: List[Union[BuildkiteStep, BuildkiteBlockStep]],
+            output_file_path: str
+            ) -> None:
+        """Output the buildkite steps to the Buildkite pipeline yaml file."""
+        buildkite_steps_dict = {"steps": [step.dict(exclude_none=True) for step in buildkite_steps]}
+        with open(output_file_path, "w") as f:
+            yaml.dump(buildkite_steps_dict, f, sort_keys=False)
+
+    def generate(self):
+        test_steps = self.read_test_steps(self.config.test_path)
+        buildkite_steps = [self.generate_build_step()]
+
+        for test_step in test_steps:
+            test_buildkite_steps = self.convert_test_step_to_buildkite_steps(test_step)
+            buildkite_steps.extend(test_buildkite_steps)
+        buildkite_steps.extend(self.get_external_hardware_tests(test_steps))
+
+        self.write_buildkite_steps(buildkite_steps, self.config.pipeline_file_path)
+
 
 @click.command()
 @click.option("--run_all", type=str)
 @click.option("--list_file_diff", type=str)
 def main(run_all: str = "-1", list_file_diff: str = None):
     list_file_diff = list_file_diff.split("|") if list_file_diff else []
-    pipeline_generator = PipelineGenerator(run_all == "1", list_file_diff)
-
-    test_steps = pipeline_generator.read_test_steps(TEST_PATH)
-
-    buildkite_steps = [
-        pipeline_generator.generate_build_step(),
-        *[step for test_step in test_steps for step in pipeline_generator.process_step(test_step)],
-        *pipeline_generator.get_external_hardware_tests(test_steps)
-    ]
-
-    pipeline_generator.write_buildkite_steps(buildkite_steps, PIPELINE_FILE_PATH)
+    pipeline_generator_config = PipelineGeneratorConfig(
+        run_all=run_all == "1",
+        list_file_diff=list_file_diff,
+        container_registry=VLLM_ECR_URL,
+        container_registry_repo=VLLM_ECR_REPO,
+        commit=os.getenv("BUILDKITE_COMMIT"),
+        test_path=TEST_PATH,
+        external_hardware_test_path=EXTERNAL_HARDWARE_TEST_PATH,
+        pipeline_file_path=PIPELINE_FILE_PATH
+    )
+    pipeline_generator = PipelineGenerator(pipeline_generator_config)
+    pipeline_generator.generate()
 
 
 if __name__ == "__main__":

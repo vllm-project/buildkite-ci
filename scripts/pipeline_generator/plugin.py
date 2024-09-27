@@ -6,6 +6,39 @@ from .utils import HF_HOME
 DOCKER_PLUGIN_NAME = "docker#v5.2.0"
 KUBERNETES_PLUGIN_NAME = "kubernetes"
 
+DEFAULT_DOCKER_ENVIRONMENT_VARIBLES = [
+    f"HF_HOME={HF_HOME}",
+    "VLLM_USAGE_SOURCE=ci-test",
+    "HF_TOKEN",
+    "BUILDKITE_ANALYTICS_TOKEN"
+]
+DEFAULT_DOCKER_VOLUMES = [
+    "/dev/shm:/dev/shm",
+    f"{HF_HOME}:{HF_HOME}"
+]
+DEFAULT_KUBERNETES_CONTAINER_VOLUME_MOUNTS = [
+    {"name": "devshm", "mountPath": "/dev/shm"},
+    {"name": "hf-cache", "mountPath": HF_HOME}
+]
+DEFAULT_KUBERNETES_CONTAINER_ENVIRONMENT_VARIABLES = [
+    {"name": "HF_HOME", "value": HF_HOME},
+    {"name": "VLLM_USAGE_SOURCE", "value": "ci-test"},
+    {
+        "name": "HF_TOKEN",
+        "valueFrom": {
+            "secretKeyRef": {
+                "name": "hf-token-secret",
+                "key": "token"
+            }
+        }
+    },
+]
+DEFAULT_KUBERNETES_POD_VOLUMES = [
+    {"name": "devshm", "emptyDir": {"medium": "Memory"}},
+    {"name": "hf-cache", "hostPath": {"path": HF_HOME, "type": "Directory"}}
+]
+DEFAULT_KUBERNETES_NODE_SELECTOR = {"nvidia.com/gpu.product": "NVIDIA-A100-SXM4-80GB"}
+
 
 class DockerPluginConfig(BaseModel):
     """
@@ -19,16 +52,8 @@ class DockerPluginConfig(BaseModel):
     gpus: Optional[str] = "all"
     mount_buildkite_agent: Optional[bool] = Field(default=False, alias="mount-buildkite-agent")
     command: List[str] = Field(default_factory=list)
-    environment: List[str] = [
-        f"HF_HOME={HF_HOME}",
-        "VLLM_USAGE_SOURCE=ci-test",
-        "HF_TOKEN",
-        "BUILDKITE_ANALYTICS_TOKEN"
-    ]
-    volumes: List[str] = [
-        "/dev/shm:/dev/shm",
-        f"{HF_HOME}:{HF_HOME}"
-    ]
+    environment: List[str] = DEFAULT_DOCKER_ENVIRONMENT_VARIBLES
+    volumes: List[str] = DEFAULT_DOCKER_VOLUMES
 
 
 class KubernetesPodContainerConfig(BaseModel):
@@ -40,25 +65,10 @@ class KubernetesPodContainerConfig(BaseModel):
     resources: Dict[str, Dict[str, int]]
     volume_mounts: List[Dict[str, str]] = Field(
         alias="volumeMounts",
-        default=[
-            {"name": "devshm", "mountPath": "/dev/shm"},
-            {"name": "hf-cache", "mountPath": HF_HOME}
-        ]
+        default=DEFAULT_KUBERNETES_CONTAINER_VOLUME_MOUNTS
     )
     env: List[Dict[str, str]] = Field(
-        default=[
-            {"name": "HF_HOME", "value": HF_HOME},
-            {"name": "VLLM_USAGE_SOURCE", "value": "ci-test"},
-            {
-                "name": "HF_TOKEN",
-                "valueFrom": {
-                    "secretKeyRef": {
-                        "name": "hf-token-secret",
-                        "key": "token"
-                    }
-                }
-            },
-        ],
+        default=DEFAULT_KUBERNETES_CONTAINER_ENVIRONMENT_VARIABLES,
     )
 
 
@@ -69,14 +79,11 @@ class KubernetesPodSpec(BaseModel):
     containers: List[KubernetesPodContainerConfig]
     priority_class_name: str = Field(default="ci", alias="priorityClassName")
     node_selector: Dict[str, Any] = Field(
-        default={"nvidia.com/gpu.product": "NVIDIA-A100-SXM4-80GB"},
+        default=DEFAULT_KUBERNETES_NODE_SELECTOR,
         alias="nodeSelector"
     )
     volumes: List[Dict[str, Any]] = Field(
-        default=[
-            {"name": "devshm", "emptyDir": {"medium": "Memory"}},
-            {"name": "hf-cache", "hostPath": {"path": HF_HOME, "type": "Directory"}}
-        ]
+        default=DEFAULT_KUBERNETES_POD_VOLUMES
     )
 
 
@@ -88,6 +95,7 @@ class KubernetesPluginConfig(BaseModel):
 
 
 def get_kubernetes_plugin_config(container_image: str, test_bash_command: List[str], num_gpus: int) -> Dict:
+    test_bash_command[-1] = f'"{test_bash_command[-1]}"'
     pod_spec = KubernetesPodSpec(
         containers=[
             KubernetesPodContainerConfig(

@@ -7,7 +7,6 @@ DEFAULT_WORKING_DIR = "/vllm-workspace/tests"
 VLLM_ECR_URL = "public.ecr.aws/q9t5s3a7"
 VLLM_ECR_REPO = f"{VLLM_ECR_URL}/vllm-ci-test-repo"
 AMD_REPO = "rocm/vllm-ci"
-A100_GPU = "a100"
 
 # File paths
 TEST_PATH = ".buildkite/test-pipeline.yaml"
@@ -17,6 +16,8 @@ MULTI_NODE_TEST_SCRIPT = ".buildkite/run-multi-node-test.sh"
 
 STEPS_TO_BLOCK = []
 
+class GPUType(str, enum.Enum):
+    A100 = "a100"
 
 class AgentQueue(str, enum.Enum):
     AWS_CPU = "cpu_queue"

@@ -95,7 +95,6 @@ class KubernetesPluginConfig(BaseModel):
 
 
 def get_kubernetes_plugin_config(container_image: str, test_bash_command: List[str], num_gpus: int) -> Dict:
-    test_bash_command[-1] = f'"{test_bash_command[-1]}"'
     pod_spec = KubernetesPodSpec(
         containers=[
             KubernetesPodContainerConfig(

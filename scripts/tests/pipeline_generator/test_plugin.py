@@ -11,7 +11,7 @@ from scripts.pipeline_generator.plugin import (
 
 def test_get_kubernetes_plugin_config():
     docker_image_path = "test_image:latest"
-    test_bash_command = ["bash", "-c", "echo A"]
+    test_bash_command = ["echo", "Hello, Kubernetes!"]
     num_gpus = 1
 
     expected_config = {
@@ -20,7 +20,7 @@ def test_get_kubernetes_plugin_config():
                 "containers": [
                     {
                         "image": docker_image_path,
-                        "command": ['bash -c "echo A"'],
+                        "command": [" ".join(test_bash_command)],
                         "resources": {"limits": {"nvidia.com/gpu": num_gpus}},
                         "volumeMounts": [
                             {"name": "devshm", "mountPath": "/dev/shm"},

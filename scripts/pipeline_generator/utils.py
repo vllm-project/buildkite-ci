@@ -15,6 +15,12 @@ EXTERNAL_HARDWARE_TEST_PATH = ".buildkite/external-tests.yaml"
 PIPELINE_FILE_PATH = ".buildkite/pipeline.yaml"
 MULTI_NODE_TEST_SCRIPT = ".buildkite/run-multi-node-test.sh"
 
+TEST_DEFAULT_COMMANDS = [
+    "(command nvidia-smi || true)", # Sanity check for Nvidia GPU setup
+    "export VLLM_LOGGING_LEVEL=DEBUG",
+    "export VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1",
+]
+
 STEPS_TO_BLOCK = []
 
 
@@ -33,14 +39,19 @@ def get_agent_queue(no_gpu: Optional[bool], gpu_type: Optional[str], num_gpus: O
         return AgentQueue.AWS_SMALL_CPU
     if gpu_type == A100_GPU:
         return AgentQueue.A100
-    return AgentQueue.AWS_1xL4 if num_gpus == 1 else AgentQueue.AWS_4xL4
+    return AgentQueue.AWS_1xL4 if not num_gpus or num_gpus == 1 else AgentQueue.AWS_4xL4
 
 
 def get_full_test_command(test_commands: List[str], step_working_dir: str) -> str:
     """Convert test commands into one-line command with the right directory."""
     working_dir = step_working_dir or DEFAULT_WORKING_DIR
     test_commands_str = ";\n".join(test_commands)
-    return f"cd {working_dir};\n{test_commands_str}"
+    full_test_commands = [
+        *TEST_DEFAULT_COMMANDS,
+        f"cd {working_dir}",
+        test_commands_str
+    ]
+    return ";\n".join(full_test_commands)
 
 
 def get_multi_node_test_command(

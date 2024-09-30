@@ -8,8 +8,10 @@ from scripts.pipeline_generator.utils import (
     get_multi_node_test_command,
     AgentQueue,
     MULTI_NODE_TEST_SCRIPT,
+    TEST_DEFAULT_COMMANDS,
 )
 
+TEST_DEFAULT_COMMANDS_STR = ";\n".join(TEST_DEFAULT_COMMANDS)
 
 @pytest.mark.parametrize(
     ("no_gpu", "gpu_type", "num_gpus", "expected_result"),
@@ -27,9 +29,9 @@ def test_get_agent_queue(no_gpu: bool, gpu_type: str, num_gpus: int, expected_re
 @pytest.mark.parametrize(
     ("test_commands", "step_working_dir", "expected_result"),
     [
-        (["echo 'hello'"], None, "cd /vllm-workspace/tests;\necho 'hello'"),
-        (["echo 'hello'"], "/vllm-workspace/tests", "cd /vllm-workspace/tests;\necho 'hello'"),
-        (["echo 'hello1'", "echo 'hello2'"], None, "cd /vllm-workspace/tests;\necho 'hello1';\necho 'hello2'"),
+        (["echo 'hello'"], None, f"{TEST_DEFAULT_COMMANDS_STR};\ncd /vllm-workspace/tests;\necho 'hello'"),
+        (["echo 'hello'"], "/vllm-workspace/tests", f"{TEST_DEFAULT_COMMANDS_STR};\ncd /vllm-workspace/tests;\necho 'hello'"),
+        (["echo 'hello1'", "echo 'hello2'"], "/sample_tests", f"{TEST_DEFAULT_COMMANDS_STR};\ncd /sample_tests;\necho 'hello1';\necho 'hello2'"),
     ],
 )
 def test_get_full_test_command(test_commands: List[str], step_working_dir: str, expected_result: str):

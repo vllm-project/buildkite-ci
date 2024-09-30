@@ -16,7 +16,7 @@ PIPELINE_FILE_PATH = ".buildkite/pipeline.yaml"
 MULTI_NODE_TEST_SCRIPT = ".buildkite/run-multi-node-test.sh"
 
 TEST_DEFAULT_COMMANDS = [
-    "(command nvidia-smi || true)",
+    "(command nvidia-smi || true)", # Sanity check for Nvidia GPU setup
     "export VLLM_LOGGING_LEVEL=DEBUG",
     "export VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1",
 ]

@@ -7,7 +7,6 @@ DEFAULT_WORKING_DIR = "/vllm-workspace/tests"
 VLLM_ECR_URL = "public.ecr.aws/q9t5s3a7"
 VLLM_ECR_REPO = f"{VLLM_ECR_URL}/vllm-ci-test-repo"
 AMD_REPO = "rocm/vllm-ci"
-A100_GPU = "a100"
 
 # File paths
 TEST_PATH = ".buildkite/test-pipeline.yaml"
@@ -23,6 +22,8 @@ TEST_DEFAULT_COMMANDS = [
 
 STEPS_TO_BLOCK = []
 
+class GPUType(str, enum.Enum):
+    A100 = "a100"
 
 class AgentQueue(str, enum.Enum):
     AWS_CPU = "cpu_queue"
@@ -37,7 +38,7 @@ class AgentQueue(str, enum.Enum):
 def get_agent_queue(no_gpu: Optional[bool], gpu_type: Optional[str], num_gpus: Optional[int]) -> AgentQueue:
     if no_gpu:
         return AgentQueue.AWS_SMALL_CPU
-    if gpu_type == A100_GPU:
+    if gpu_type == GPUType.A100.value:
         return AgentQueue.A100
     return AgentQueue.AWS_1xL4 if not num_gpus or num_gpus == 1 else AgentQueue.AWS_4xL4
 

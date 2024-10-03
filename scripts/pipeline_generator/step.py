@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field, root_validator, model_validator
 from typing import List, Dict, Any, Optional
 from typing_extensions import Self
+
 from .utils import AgentQueue, GPUType
 
 BUILD_STEP_KEY = "build"
@@ -57,9 +58,9 @@ class TestStep(BaseModel):
 class BuildkiteStep(BaseModel):
     """This class represents a step in Buildkite format."""
     label: str
-    key: str
     agents: Dict[str, AgentQueue] = {"queue": AgentQueue.AWS_CPU}
     commands: List[str]
+    key: Optional[str] = None
     plugins: Optional[List[Dict]] = None
     parallelism: Optional[int] = None
     soft_fail: Optional[bool] = None

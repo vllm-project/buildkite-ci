@@ -195,7 +195,7 @@ steps:
         env:
           DOCKER_BUILDKIT: "1"
         priority: 100
-        {% if step.soft_fail or step.label == "Engine Test" or step.label == "Kernels Test %N" %}
+        {% if step.soft_fail or step.label == "Kernels Test %N" or step.label == "Entrypoints Test" %}
         soft_fail: true
         {% else %}
         soft_fail: false

@@ -7,7 +7,6 @@ DEFAULT_WORKING_DIR = "/vllm-workspace/tests"
 VLLM_ECR_URL = "public.ecr.aws/q9t5s3a7"
 VLLM_ECR_REPO = f"vllm-ci-test-repo"
 AMD_REPO = "rocm/vllm-ci"
-A100_GPU = "a100"
 
 # File paths
 TEST_PATH = "./test-pipeline.yaml"
@@ -15,8 +14,16 @@ EXTERNAL_HARDWARE_TEST_PATH = "./external-tests.yaml"
 PIPELINE_FILE_PATH = "./pipeline.yaml"
 MULTI_NODE_TEST_SCRIPT = ".buildkite/run-multi-node-test.sh"
 
+TEST_DEFAULT_COMMANDS = [
+    "(command nvidia-smi || true)", # Sanity check for Nvidia GPU setup
+    "export VLLM_LOGGING_LEVEL=DEBUG",
+    "export VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1",
+]
+
 STEPS_TO_BLOCK = []
 
+class GPUType(str, enum.Enum):
+    A100 = "a100"
 
 class AgentQueue(str, enum.Enum):
     AWS_CPU = "cpu_queue"
@@ -31,24 +38,21 @@ class AgentQueue(str, enum.Enum):
 def get_agent_queue(no_gpu: Optional[bool], gpu_type: Optional[str], num_gpus: Optional[int]) -> AgentQueue:
     if no_gpu:
         return AgentQueue.AWS_SMALL_CPU
-    if gpu_type == A100_GPU:
+    if gpu_type == GPUType.A100.value:
         return AgentQueue.A100
-    return AgentQueue.AWS_1xL4 if not num_gpus or num_gpus == 1else AgentQueue.AWS_4xL4
+    return AgentQueue.AWS_1xL4 if not num_gpus or num_gpus == 1 else AgentQueue.AWS_4xL4
 
 
 def get_full_test_command(test_commands: List[str], step_working_dir: str) -> str:
     """Convert test commands into one-line command with the right directory."""
     working_dir = step_working_dir or DEFAULT_WORKING_DIR
     test_commands_str = ";\n".join(test_commands)
-    # Always add these commands before running the tests
-    commands = [
-        "(command nvidia-smi || true)",
-        "export VLLM_LOGGING_LEVEL=DEBUG",
-        "export VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1",
+    full_test_commands = [
+        *TEST_DEFAULT_COMMANDS,
         f"cd {working_dir}",
         test_commands_str
     ]
-    return ";\n".join(commands)
+    return ";\n".join(full_test_commands)
 
 
 def get_multi_node_test_command(

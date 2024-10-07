@@ -18,7 +18,7 @@ class PipelineGeneratorConfig:
         list_file_diff: Optional[List[str]] = None,
     ):
         self.run_all = run_all
-        self.list_file_diff = list_file_diff
+        self.list_file_diff = list_file_diff or []
         self.container_registry = container_registry
         self.container_registry_repo = container_registry_repo
         self.commit = commit

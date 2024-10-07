@@ -11,14 +11,14 @@ class PipelineGeneratorConfig:
         container_registry: str,
         container_registry_repo: str,
         commit: str,
+        list_file_diff: List[str],
         test_path: str,  # List of tests
         external_hardware_test_path: str,  # List of external hardware tests
         pipeline_file_path: str,  # Path to the output pipeline file
         run_all: bool = False,
-        list_file_diff: Optional[List[str]] = None,
     ):
         self.run_all = run_all
-        self.list_file_diff = list_file_diff or []
+        self.list_file_diff = list_file_diff
         self.container_registry = container_registry
         self.container_registry_repo = container_registry_repo
         self.commit = commit

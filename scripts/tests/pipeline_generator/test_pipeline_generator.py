@@ -12,43 +12,33 @@ PIPELINE_OUTPUT_FILE_PATH = "pipeline.yaml"
 
 
 def test_pipeline_generator_config_get_container_image():
-    with tempfile.TemporaryDirectory() as temp_dir:
-        with open(os.path.join(temp_dir, TEST_FILE_PATH), "w") as f:
-            f.write("content")
-        with open(os.path.join(temp_dir, EXTERNAL_HARDWARE_TEST_FILE_PATH), "w") as f:
-            f.write("content")
-        container_registry = "container.registry"
-        container_registry_repo = "test"
-        pipeline_generator_config = PipelineGeneratorConfig(
-            run_all=True,
-            list_file_diff=[],
-            container_registry=container_registry,
-            container_registry_repo=container_registry_repo,
-            commit=TEST_COMMIT,
-            test_path=os.path.join(temp_dir, TEST_FILE_PATH),
-            external_hardware_test_path=os.path.join(temp_dir, EXTERNAL_HARDWARE_TEST_FILE_PATH),
-            pipeline_file_path=os.path.join(temp_dir, PIPELINE_OUTPUT_FILE_PATH)
-        )
-        assert pipeline_generator_config.container_image == f"{container_registry}/{container_registry_repo}:{TEST_COMMIT}"
+    container_registry = "container.registry"
+    container_registry_repo = "test"
+    pipeline_generator_config = PipelineGeneratorConfig(
+        run_all=True,
+        list_file_diff=[],
+        container_registry=container_registry,
+        container_registry_repo=container_registry_repo,
+        commit=TEST_COMMIT,
+        test_path=TEST_FILE_PATH,
+        external_hardware_test_path=EXTERNAL_HARDWARE_TEST_FILE_PATH,
+        pipeline_file_path=PIPELINE_OUTPUT_FILE_PATH
+    )
+    assert pipeline_generator_config.container_image == f"{container_registry}/{container_registry_repo}:{TEST_COMMIT}"
 
 
 def test_get_pipeline_generator_config_invalid_commit():
-    with tempfile.TemporaryDirectory() as temp_dir:
-        with open(os.path.join(temp_dir, TEST_FILE_PATH), "w") as f:
-            f.write("content")
-        with open(os.path.join(temp_dir, EXTERNAL_HARDWARE_TEST_FILE_PATH), "w") as f:
-            f.write("content")
-        with pytest.raises(ValueError, match="not a valid Git commit hash"):
-            _ = PipelineGeneratorConfig(
-                run_all=True,
-                list_file_diff=[],
-                container_registry="container.registry",
-                container_registry_repo="test",
-                commit=TEST_COMMIT[:-2],
-                test_path=os.path.join(temp_dir, TEST_FILE_PATH),
-                external_hardware_test_path=os.path.join(temp_dir, EXTERNAL_HARDWARE_TEST_FILE_PATH),
-                pipeline_file_path=os.path.join(temp_dir, PIPELINE_OUTPUT_FILE_PATH)
-            )
+    with pytest.raises(ValueError, match="not a valid Git commit hash"):
+        _ = PipelineGeneratorConfig(
+            run_all=True,
+            list_file_diff=[],
+            container_registry="container.registry",
+            container_registry_repo="test",
+            commit=TEST_COMMIT[:-2],
+            test_path=TEST_FILE_PATH,
+    external_hardware_test_path=EXTERNAL_HARDWARE_TEST_FILE_PATH,
+    pipeline_file_path=PIPELINE_OUTPUT_FILE_PATH
+        )
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 import os
 import re
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel, field_validator
 
@@ -15,7 +15,7 @@ class PipelineGeneratorConfig:
         external_hardware_test_path: str,  # List of external hardware tests
         pipeline_file_path: str,  # Path to the output pipeline file
         run_all: bool = False,
-        list_file_diff: List[str] = []
+        list_file_diff: Optional[List[str]] = None,
     ):
         self.run_all = run_all
         self.list_file_diff = list_file_diff

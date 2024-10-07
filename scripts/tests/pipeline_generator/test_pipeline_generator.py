@@ -32,40 +32,6 @@ def test_pipeline_generator_config_get_container_image():
         assert pipeline_generator_config.container_image == f"{container_registry}/{container_registry_repo}:{TEST_COMMIT}"
 
 
-def test_get_pipeline_generator_config_test_file_nonexist():
-    with tempfile.TemporaryDirectory() as temp_dir:
-        with open(os.path.join(temp_dir, EXTERNAL_HARDWARE_TEST_FILE_PATH), "w") as f:
-            f.write("content")
-        with pytest.raises(ValueError, match="Test path"):
-            _ = PipelineGeneratorConfig(
-                run_all=True,
-                list_file_diff=[],
-                container_registry="container.registry",
-                container_registry_repo="test",
-                commit=TEST_COMMIT,
-                test_path=os.path.join(temp_dir, TEST_FILE_PATH),
-                external_hardware_test_path=os.path.join(temp_dir, EXTERNAL_HARDWARE_TEST_FILE_PATH),
-                pipeline_file_path=os.path.join(temp_dir, PIPELINE_OUTPUT_FILE_PATH)
-            )
-
-
-def test_get_pipeline_generator_config_ext_hardware_test_file_nonexist():
-    with tempfile.TemporaryDirectory() as temp_dir:
-        with open(os.path.join(temp_dir, TEST_FILE_PATH), "w") as f:
-            f.write("content")
-        with pytest.raises(ValueError, match="External hardware test path"):
-            _ = PipelineGeneratorConfig(
-                run_all=True,
-                list_file_diff=[],
-                container_registry="container.registry",
-                container_registry_repo="test",
-                commit=TEST_COMMIT,
-                test_path=os.path.join(temp_dir, TEST_FILE_PATH),
-                external_hardware_test_path=os.path.join(temp_dir, EXTERNAL_HARDWARE_TEST_FILE_PATH),
-                pipeline_file_path=os.path.join(temp_dir, PIPELINE_OUTPUT_FILE_PATH)
-            )
-
-
 def test_get_pipeline_generator_config_invalid_commit():
     with tempfile.TemporaryDirectory() as temp_dir:
         with open(os.path.join(temp_dir, TEST_FILE_PATH), "w") as f:

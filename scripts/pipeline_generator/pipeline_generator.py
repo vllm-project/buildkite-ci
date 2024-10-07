@@ -19,20 +19,6 @@ class PipelineGeneratorConfig(BaseModel):
     def container_image(self) -> str:
         return f"{self.container_registry}/{self.container_registry_repo}:{self.commit}"
 
-    @field_validator("test_path")
-    @classmethod
-    def check_test_path(cls, value: str) -> str:
-        if not os.path.exists(value):
-            raise ValueError(f"Test path {value} does not exist")
-        return value
-
-    @field_validator("external_hardware_test_path")
-    @classmethod
-    def check_external_hardware_test_path(cls, value: str) -> str:
-        if not os.path.exists(value):
-            raise ValueError(f"External hardware test path {value} does not exist")
-        return value
-
     @field_validator("commit")
     @classmethod
     def check_commit(cls, value: str) -> str:

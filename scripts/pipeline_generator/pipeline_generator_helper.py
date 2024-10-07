@@ -9,5 +9,6 @@ def step_should_run(step: TestStep, run_all: bool, list_file_diff: List[str]) ->
     if not step.source_file_dependencies or run_all:
         return True
     return any(source_file in diff_file
-                for source_file in step.source_file_dependencies
-                for diff_file in list_file_diff)
+        for source_file in step.source_file_dependencies
+        for diff_file in list_file_diff
+    )

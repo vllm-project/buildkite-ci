@@ -38,11 +38,11 @@ class PipelineGeneratorConfig:
             raise ValueError(f"Commit {self.commit} is not a valid Git commit hash")
 
         # Check if test_path exists
-        if not os.path.exists(self.test_path):
+        if not os.path.isfile(self.test_path):
             raise FileNotFoundError(f"Test file {self.test_path} not found")
         
         # Check if external_hardware_test_path exists
-        if not os.path.exists(self.external_hardware_test_path):
+        if not os.path.isfile(self.external_hardware_test_path):
             raise FileNotFoundError(f"External hardware test file {self.external_hardware_test_path} not found")
 
 
@@ -51,5 +51,5 @@ class PipelineGenerator:
             self, 
             config: PipelineGeneratorConfig
         ):
+        config.validate()
         self.config = config
-        self.config.validate()

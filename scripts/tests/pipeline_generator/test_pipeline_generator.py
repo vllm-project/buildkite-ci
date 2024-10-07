@@ -23,6 +23,7 @@ def _get_pipeline_generator_config(test_dir: str):
         container_registry=TEST_CONTAINER_REGISTRY,
         container_registry_repo=TEST_CONTAINER_REGISTRY_REPO,
         commit=TEST_COMMIT,
+        list_file_diff=[],
         test_path=os.path.join(test_dir, TEST_FILE_PATH),
         external_hardware_test_path=os.path.join(test_dir, EXTERNAL_HARDWARE_TEST_FILE_PATH),
         pipeline_file_path=os.path.join(test_dir, PIPELINE_OUTPUT_FILE_PATH)
@@ -49,6 +50,7 @@ def test_get_pipeline_generator_config_invalid_commit(commit):
         config.commit = commit
         with pytest.raises(ValueError, match="not a valid Git commit hash"):
             config.validate()
+
 
 def test_get_pipeline_generator_fail_nonexistent_test_file():
     with tempfile.TemporaryDirectory() as temp_dir:

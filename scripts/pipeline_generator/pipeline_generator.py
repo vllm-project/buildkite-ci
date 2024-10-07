@@ -25,7 +25,10 @@ class PipelineGeneratorConfig:
         self.test_path = test_path
         self.external_hardware_test_path = external_hardware_test_path
         self.pipeline_file_path = pipeline_file_path
-        self.container_image = f"{self.container_registry}/{self.container_registry_repo}:{self.commit}"
+    
+    @property
+    def container_image(self):
+        return f"{self.container_registry}/{self.container_registry_repo}:{self.commit}"
     
     def validate(self):
         """Validate the configuration."""

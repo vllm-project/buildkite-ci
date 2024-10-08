@@ -43,7 +43,7 @@ def get_agent_queue(no_gpu: Optional[bool], gpu_type: Optional[str], num_gpus: O
     return AgentQueue.AWS_1xL4 if not num_gpus or num_gpus == 1 else AgentQueue.AWS_4xL4
 
 
-def get_full_test_command(test_commands: List[str], step_working_dir: str) -> str:
+def get_full_test_command(test_commands: List[str], step_working_dir: Optional[str] = None) -> str:
     """Convert test commands into one-line command with the right directory."""
     working_dir = step_working_dir or DEFAULT_WORKING_DIR
     test_commands_str = ";\n".join(test_commands)

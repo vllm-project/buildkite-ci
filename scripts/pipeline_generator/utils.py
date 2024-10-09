@@ -5,13 +5,13 @@ from typing import Optional, List
 HF_HOME = "/root/.cache/huggingface"
 DEFAULT_WORKING_DIR = "/vllm-workspace/tests"
 VLLM_ECR_URL = "public.ecr.aws/q9t5s3a7"
-VLLM_ECR_REPO = f"{VLLM_ECR_URL}/vllm-ci-test-repo"
+VLLM_ECR_REPO = f"vllm-ci-test-repo"
 AMD_REPO = "rocm/vllm-ci"
 
 # File paths
-TEST_PATH = ".buildkite/test-pipeline.yaml"
-EXTERNAL_HARDWARE_TEST_PATH = ".buildkite/external-tests.yaml"
-PIPELINE_FILE_PATH = ".buildkite/pipeline.yaml"
+TEST_PATH = "./test-pipeline.yaml"
+EXTERNAL_HARDWARE_TEST_PATH = "./external-tests.yaml"
+PIPELINE_FILE_PATH = "./pipeline.yaml"
 MULTI_NODE_TEST_SCRIPT = ".buildkite/run-multi-node-test.sh"
 
 TEST_DEFAULT_COMMANDS = [

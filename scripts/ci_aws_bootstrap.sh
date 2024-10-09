@@ -2,9 +2,24 @@
 
 set -euo pipefail
 
-if [[ -z "${RUN_ALL:-}" ]]; then
-    RUN_ALL=0
-fi
+RUN_ALL=${RUN_ALL:-0}
+VLLM_CI_BRANCH=${VLLM_CI_BRANCH:-main}
+
+generate_pipeline() {
+    python -m pip install "click==8.1.7" "pydantic==2.9.2"
+
+    # Download necessary files
+    mkdir -p .buildkite/pipeline_generator
+    for FILE in pipeline_generator.py pipeline_generator_helper.py plugin.py step.py utils.py __init__.py; do
+        curl -o ".buildkite/pipeline_generator/$FILE" "https://raw.githubusercontent.com/vllm-project/buildkite-ci/$VLLM_CI_BRANCH/scripts/pipeline_generator/$FILE"
+    done
+
+    # Generate and upload pipeline
+    cd .buildkite
+    python -m pipeline_generator.pipeline_generator --run_all="$RUN_ALL" --list_file_diff="$LIST_FILE_DIFF"
+    cat pipeline.yaml
+    buildkite-agent pipeline upload pipeline.yaml
+}
 
 upload_pipeline() {
     echo "Uploading pipeline..."
@@ -74,4 +89,9 @@ LIST_FILE_DIFF=$(get_diff | tr ' ' '|')
 if [[ $BUILDKITE_BRANCH == "main" ]]; then
     LIST_FILE_DIFF=$(get_diff_main | tr ' ' '|')
 fi
-upload_pipeline
+
+if [[ $BUILDKITE_PIPELINE_SLUG == "fastcheck" ]]; then
+    upload_pipeline
+else
+    generate_pipeline
+fi

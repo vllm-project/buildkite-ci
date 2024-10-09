@@ -28,11 +28,11 @@ class TestStep(BaseModel):
     @classmethod
     def validate_and_convert_command(cls, values) -> Any:
         """
-        Validate that either 'command' or 'commands' is defined.
+        Validate that either 'command' or 'commands' or `plugins` is defined.
         If 'command' is defined, convert it to 'commands'.
         """
-        if not values.get("command") and not values.get("commands"):
-            raise ValueError("Either 'command' or 'commands' must be defined.")
+        if not values.get("command") and not values.get("commands") and not values.get("plugins"):
+            raise ValueError("Either 'command' or 'commands' or `plugins` must be defined.")
         if values.get("command") and values.get("commands"):
             raise ValueError("Only one of 'command' or 'commands' can be defined.")
         if values.get("command"):
@@ -59,7 +59,7 @@ class BuildkiteStep(BaseModel):
     """This class represents a step in Buildkite format."""
     label: str
     agents: Dict[str, AgentQueue] = {"queue": AgentQueue.AWS_CPU}
-    commands: List[str]
+    commands: Optional[List[str]] = None
     key: Optional[str] = None
     plugins: Optional[List[Dict]] = None
     parallelism: Optional[int] = None

@@ -1,9 +1,11 @@
+import click
 import os
 import re
+import yaml
 from typing import List, Optional
 
 from pydantic import BaseModel, field_validator
-
+from .step import TestStep
 
 class PipelineGeneratorConfig:
     def __init__(
@@ -53,3 +55,26 @@ class PipelineGenerator:
         ):
         config.validate()
         self.config = config
+
+def read_test_steps(file_path: str) -> List[TestStep]:
+    """Read test steps from test pipeline yaml and parse them into TestStep objects."""
+    print(os.getcwd(), os.path.abspath(file_path))
+    with open(file_path, "r") as f:
+        content = yaml.safe_load(f)
+    return [TestStep(**step) for step in content["steps"]]
+
+@click.command()
+@click.option("--test_path", type=str, required=True, help="Path to the test pipeline yaml file")
+@click.option("--run_all", type=str)
+@click.option("--list_file_diff", type=str)
+def main(test_path: str, external_hardware_test_path: str, run_all: str, list_file_diff: str):
+    test_steps = read_test_steps(test_path)
+
+    pipeline_generator_config = PipelineGeneratorConfig(
+        run_all=run_all == "1",
+        list_file_diff=list_file_diff,
+        container_registry=VLLM_ECR_URL,
+        container_registry_repo=VLLM_ECR_REPO,
+        commit=os.getenv("BUILDKITE_COMMIT"),
+        pipeline_file_path=PIPELINE_FILE_PATH
+    )

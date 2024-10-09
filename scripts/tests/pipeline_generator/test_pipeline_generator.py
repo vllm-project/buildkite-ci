@@ -3,7 +3,8 @@ import sys
 import os
 import tempfile
 
-from scripts.pipeline_generator.pipeline_generator import PipelineGeneratorConfig, PipelineGenerator
+from scripts.pipeline_generator.pipeline_generator import PipelineGeneratorConfig, PipelineGenerator, read_test_steps
+from scripts.pipeline_generator.step import DEFAULT_TEST_WORKING_DIR
 
 TEST_COMMIT = "abcdef0123456789abcdef0123456789abcdef01"
 TEST_FILE_PATH = "tests.yaml"
@@ -58,6 +59,27 @@ def test_get_pipeline_generator_fail_nonexistent_test_file():
         config.test_path = "non-existent-file"
         with pytest.raises(FileNotFoundError, match="Test file"):
             _ = PipelineGenerator(config)
+
+
+def test_read_test_steps():
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    test_path = os.path.join(current_dir, "test_files/test-pipeline.yaml")
+    test_steps = read_test_steps(test_path)
+    assert len(test_steps) == 4
+    assert test_steps[0].commands == ['echo "Test 1"']
+    assert test_steps[0].command is None
+    assert test_steps[0].working_dir == DEFAULT_TEST_WORKING_DIR
+
+    assert test_steps[1].working_dir == "/tests2/"
+    assert test_steps[1].no_gpu is True
+
+    assert test_steps[2].commands == ['echo "Test 3"', 'echo "Test 3.1"']
+    assert test_steps[2].source_file_dependencies == ["file1", "src/file2"]
+
+    assert test_steps[3].commands == ['echo "Test 4.1"', 'echo "Test 4.2"']
+    assert test_steps[3].num_nodes == 2
+    assert test_steps[3].num_gpus == 4
+
 
 if __name__ == "__main__":
     sys.exit(pytest.main(["-v", __file__]))

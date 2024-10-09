@@ -1,6 +1,6 @@
 from typing import List, Dict
 from .plugin import get_kubernetes_plugin_config, get_docker_plugin_config
-from .utils import get_agent_queue, get_full_test_command, get_multi_node_test_command, A100_GPU
+from .utils import get_agent_queue, get_full_test_command, get_multi_node_test_command, GPUType
 from .step import BuildkiteStep, TestStep, get_step_key
 
 def step_should_run(step: TestStep, run_all: bool, list_file_diff: List[str]) -> bool:
@@ -21,7 +21,7 @@ def get_plugin_config(step: TestStep, container_image: str) -> Dict:
         "-c",
         get_full_test_command(test_step_commands, step.working_dir)
     ]
-    if step.gpu == A100_GPU:
+    if step.gpu == GPUType.A100:
         return get_kubernetes_plugin_config(
             container_image,
             test_bash_command,

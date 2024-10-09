@@ -11,7 +11,6 @@ from .plugin import (
 from .utils import (
     AgentQueue,
     AMD_REPO,
-    A100_GPU,
     TEST_PATH,
     EXTERNAL_HARDWARE_TEST_PATH,
     PIPELINE_FILE_PATH,
@@ -36,19 +35,61 @@ from .pipeline_generator_helper import (
     get_build_commands,
 )
 
-class PipelineGeneratorConfig(BaseModel):
-    run_all: bool
-    list_file_diff: List[str]
-    container_registry: str
-    container_registry_repo: str
-    commit: str
-    test_path: str
-    external_hardware_test_path: str
-    pipeline_file_path: str
-
+class PipelineGeneratorConfig:
+    def __init__(
+        self,
+        container_registry: str,
+        container_registry_repo: str,
+        commit: str,
+        list_file_diff: List[str],
+        test_path: str,  # List of tests
+        external_hardware_test_path: str,  # List of external hardware tests
+        pipeline_file_path: str,  # Path to the output pipeline file
+        run_all: bool = False,
+    ):
+        self.run_all = run_all
+        self.list_file_diff = list_file_diff
+        self.container_registry = container_registry
+        self.container_registry_repo = container_registry_repo
+        self.commit = commit
+        self.test_path = test_path
+        self.external_hardware_test_path = external_hardware_test_path
+        self.pipeline_file_path = pipeline_file_path
+    
     @property
-    def container_image(self) -> str:
+    def container_image(self):
         return f"{self.container_registry}/{self.container_registry_repo}:{self.commit}"
+    
+    def validate(self):
+        """Validate the configuration."""
+        # Check if commit is a valid Git commit hash
+        pattern = r"^[0-9a-f]{40}$"
+        if not re.match(pattern, self.commit):
+            raise ValueError(f"Commit {self.commit} is not a valid Git commit hash")
+
+        # Check if test_path exists
+        if not os.path.isfile(self.test_path):
+            raise FileNotFoundError(f"Test file {self.test_path} not found")
+        
+        # Check if external_hardware_test_path exists
+        if not os.path.isfile(self.external_hardware_test_path):
+            raise FileNotFoundError(f"External hardware test file {self.external_hardware_test_path} not found")
+
+def read_test_steps(self, file_path: str) -> List[TestStep]:
+    """Read test steps from test pipeline yaml and parse them into TestStep objects."""
+    with open(file_path, "r") as f:
+        content = yaml.safe_load(f)
+    return [TestStep(**step) for step in content["steps"]]
+
+def write_buildkite_steps(
+        self,
+        buildkite_steps: List[Union[BuildkiteStep, BuildkiteBlockStep]],
+        output_file_path: str
+        ) -> None:
+    """Output the buildkite steps to the Buildkite pipeline yaml file."""
+    buildkite_steps_dict = {"steps": [step.dict(exclude_none=True) for step in buildkite_steps]}
+    with open(output_file_path, "w") as f:
+        yaml.dump(buildkite_steps_dict, f, sort_keys=False)
 
 class PipelineGenerator:
     def __init__(
@@ -75,12 +116,6 @@ class PipelineGenerator:
             commands=build_commands,
             depends_on=None,
         )
-
-    def read_test_steps(self, file_path: str) -> List[TestStep]:
-        """Read test steps from test pipeline yaml and parse them into Step objects."""
-        with open(file_path, "r") as f:
-            content = yaml.safe_load(f)
-        return [TestStep(**step) for step in content["steps"]]
 
     def convert_test_step_to_buildkite_steps(self, step: TestStep) -> List[Union[BuildkiteStep, BuildkiteBlockStep]]:
         """Process test step and return corresponding BuildkiteStep."""
@@ -142,15 +177,6 @@ class PipelineGenerator:
                 mirrored_buildkite_steps.append(mirrored_buildkite_step)
         return mirrored_buildkite_steps
 
-    def write_buildkite_steps(
-            self,
-            buildkite_steps: List[Union[BuildkiteStep, BuildkiteBlockStep]],
-            output_file_path: str
-            ) -> None:
-        """Output the buildkite steps to the Buildkite pipeline yaml file."""
-        buildkite_steps_dict = {"steps": [step.dict(exclude_none=True) for step in buildkite_steps]}
-        with open(output_file_path, "w") as f:
-            yaml.dump(buildkite_steps_dict, f, sort_keys=False)
 
     def generate(self):
         test_steps = self.read_test_steps(self.config.test_path)
@@ -185,3 +211,11 @@ def main(run_all: str = "-1", list_file_diff: str = None):
 
 if __name__ == "__main__":
     main()
+import os
+import re
+from typing import List, Optional
+
+from pydantic import BaseModel, field_validator
+
+
+

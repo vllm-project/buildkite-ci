@@ -2,8 +2,11 @@ import pytest
 import sys
 import os
 import tempfile
+import yaml
 
-from scripts.pipeline_generator.pipeline_generator import PipelineGeneratorConfig, PipelineGenerator
+from scripts.pipeline_generator.pipeline_generator import PipelineGeneratorConfig, PipelineGenerator, write_buildkite_steps
+from scripts.pipeline_generator.step import BuildkiteStep, BuildkiteBlockStep
+from scripts.pipeline_generator.utils import AgentQueue
 
 TEST_COMMIT = "abcdef0123456789abcdef0123456789abcdef01"
 TEST_FILE_PATH = "tests.yaml"
@@ -58,6 +61,27 @@ def test_get_pipeline_generator_fail_nonexistent_test_file():
         config.test_path = "non-existent-file"
         with pytest.raises(FileNotFoundError, match="Test file"):
             _ = PipelineGenerator(config)
+
+
+def test_write_buildkite_steps():
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    expected_output_path = os.path.join(current_dir, "test_files/expected_pipeline.yaml")
+    with open(expected_output_path, "r") as f:
+        expected_output = yaml.safe_load(f)
+
+    steps = [
+        BuildkiteStep(label="Test 1", commands=['echo "Test1.1"', 'echo "Test1.2"']),
+        BuildkiteStep(label="Test 2", commands=["command3"], agents = {"queue": AgentQueue.AWS_1xL4.value}),
+        BuildkiteBlockStep(block="Run Test 3", key="block-test-3"),
+        BuildkiteStep(label="Test 3", commands=["command4"], depends_on="block-test-3"),
+    ]
+    with tempfile.TemporaryDirectory() as temp_dir:
+        output_file_path = os.path.join(temp_dir, "output.yaml")
+        write_buildkite_steps(steps, output_file_path)
+        with open(output_file_path, "r") as f:
+            output = yaml.safe_load(f)
+        assert output == expected_output
+        
 
 if __name__ == "__main__":
     sys.exit(pytest.main(["-v", __file__]))

@@ -1,9 +1,12 @@
 import os
 import re
-from typing import List, Optional
+from typing import List, Optional, Union
+import yaml
+from enum import Enum
 
 from pydantic import BaseModel, field_validator
 
+from .step import BuildkiteStep, BuildkiteBlockStep
 
 class PipelineGeneratorConfig:
     def __init__(
@@ -53,3 +56,10 @@ class PipelineGenerator:
         ):
         config.validate()
         self.config = config
+
+
+def write_buildkite_steps(steps: List[Union[BuildkiteStep, BuildkiteBlockStep]], file_path: str) -> None:
+    """Write the buildkite steps to the Buildkite pipeline yaml file."""
+    buildkite_steps_dict = {"steps": [step.dict(exclude_none=True) for step in steps]}
+    with open(file_path, "w") as f:
+        yaml.dump(buildkite_steps_dict, f, sort_keys=False)

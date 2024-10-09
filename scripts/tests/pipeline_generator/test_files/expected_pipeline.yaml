@@ -1,0 +1,26 @@
+steps:
+  - label: Test 1
+    depends_on: build
+    agents:
+      queue: cpu_queue
+    commands:
+      - echo "Test1.1"
+      - echo "Test1.2"
+
+  - label: Test 2
+    depends_on: build
+    agents:
+      queue: gpu_1_queue
+    commands:
+      - command3
+
+  - block: "Run Test 3"
+    depends_on: build
+    key: "block-test-3"
+
+  - label: Test 3
+    agents:
+      queue: cpu_queue
+    depends_on: block-test-3
+    commands:
+      - command4

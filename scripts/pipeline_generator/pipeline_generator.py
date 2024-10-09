@@ -58,7 +58,6 @@ class PipelineGenerator:
 
 def read_test_steps(file_path: str) -> List[TestStep]:
     """Read test steps from test pipeline yaml and parse them into TestStep objects."""
-    print(os.getcwd(), os.path.abspath(file_path))
     with open(file_path, "r") as f:
         content = yaml.safe_load(f)
     return [TestStep(**step) for step in content["steps"]]

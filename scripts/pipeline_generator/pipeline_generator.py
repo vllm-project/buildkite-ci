@@ -3,10 +3,10 @@ import os
 import re
 import yaml
 from typing import List, Optional
-
 from pydantic import BaseModel, field_validator
-from .step import TestStep
 
+from .step import TestStep
+from .utils import VLLM_ECR_URL, VLLM_ECR_REPO
 class PipelineGeneratorConfig:
     def __init__(
         self,
@@ -21,9 +21,6 @@ class PipelineGeneratorConfig:
         self.container_registry = container_registry
         self.container_registry_repo = container_registry_repo
         self.commit = commit
-        self.test_path = test_path
-        self.external_hardware_test_path = external_hardware_test_path
-        self.pipeline_file_path = pipeline_file_path
     
     @property
     def container_image(self):

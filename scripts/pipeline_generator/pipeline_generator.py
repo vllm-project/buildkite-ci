@@ -61,8 +61,8 @@ def read_test_steps(file_path: str) -> List[TestStep]:
 
 @click.command()
 @click.option("--test_path", type=str, required=True, help="Path to the test pipeline yaml file")
-@click.option("--run_all", type=str)
-@click.option("--list_file_diff", type=str)
+@click.option("--run_all", type=str, help="If set to 1, run all tests")
+@click.option("--list_file_diff", type=str, help="List of files in the diff between current branch and main")
 def main(test_path: str, external_hardware_test_path: str, run_all: str, list_file_diff: str):
     test_steps = read_test_steps(test_path)
 

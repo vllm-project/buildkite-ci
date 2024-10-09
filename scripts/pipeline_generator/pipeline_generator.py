@@ -14,9 +14,6 @@ class PipelineGeneratorConfig:
         container_registry_repo: str,
         commit: str,
         list_file_diff: List[str],
-        test_path: str,  # List of tests
-        external_hardware_test_path: str,  # List of external hardware tests
-        pipeline_file_path: str,  # Path to the output pipeline file
         run_all: bool = False,
     ):
         self.run_all = run_all
@@ -75,5 +72,4 @@ def main(test_path: str, external_hardware_test_path: str, run_all: str, list_fi
         container_registry=VLLM_ECR_URL,
         container_registry_repo=VLLM_ECR_REPO,
         commit=os.getenv("BUILDKITE_COMMIT"),
-        pipeline_file_path=PIPELINE_FILE_PATH
     )

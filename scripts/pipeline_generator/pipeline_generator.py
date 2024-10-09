@@ -1,12 +1,12 @@
+import click
 import os
 import re
 from typing import List, Optional, Union
 import yaml
-from enum import Enum
-
 from pydantic import BaseModel, field_validator
 
-from .step import BuildkiteStep, BuildkiteBlockStep
+from .step import BuildkiteStep, BuildkiteBlockStep, TestStep
+from .utils import VLLM_ECR_URL, VLLM_ECR_REPO
 
 class PipelineGeneratorConfig:
     def __init__(
@@ -15,9 +15,6 @@ class PipelineGeneratorConfig:
         container_registry_repo: str,
         commit: str,
         list_file_diff: List[str],
-        test_path: str,  # List of tests
-        external_hardware_test_path: str,  # List of external hardware tests
-        pipeline_file_path: str,  # Path to the output pipeline file
         run_all: bool = False,
     ):
         self.run_all = run_all
@@ -25,9 +22,6 @@ class PipelineGeneratorConfig:
         self.container_registry = container_registry
         self.container_registry_repo = container_registry_repo
         self.commit = commit
-        self.test_path = test_path
-        self.external_hardware_test_path = external_hardware_test_path
-        self.pipeline_file_path = pipeline_file_path
     
     @property
     def container_image(self):
@@ -40,14 +34,6 @@ class PipelineGeneratorConfig:
         if not re.match(pattern, self.commit):
             raise ValueError(f"Commit {self.commit} is not a valid Git commit hash")
 
-        # Check if test_path exists
-        if not os.path.isfile(self.test_path):
-            raise FileNotFoundError(f"Test file {self.test_path} not found")
-        
-        # Check if external_hardware_test_path exists
-        if not os.path.isfile(self.external_hardware_test_path):
-            raise FileNotFoundError(f"External hardware test file {self.external_hardware_test_path} not found")
-
 
 class PipelineGenerator:
     def __init__(
@@ -58,8 +44,29 @@ class PipelineGenerator:
         self.config = config
 
 
+def read_test_steps(file_path: str) -> List[TestStep]:
+    """Read test steps from test pipeline yaml and parse them into TestStep objects."""
+    with open(file_path, "r") as f:
+        content = yaml.safe_load(f)
+    return [TestStep(**step) for step in content["steps"]]
+
 def write_buildkite_steps(steps: List[Union[BuildkiteStep, BuildkiteBlockStep]], file_path: str) -> None:
     """Write the buildkite steps to the Buildkite pipeline yaml file."""
     buildkite_steps_dict = {"steps": [step.dict(exclude_none=True) for step in steps]}
     with open(file_path, "w") as f:
         yaml.dump(buildkite_steps_dict, f, sort_keys=False)
+
+@click.command()
+@click.option("--test_path", type=str, required=True, help="Path to the test pipeline yaml file")
+@click.option("--run_all", type=str, help="If set to 1, run all tests")
+@click.option("--list_file_diff", type=str, help="List of files in the diff between current branch and main")
+def main(test_path: str, external_hardware_test_path: str, run_all: str, list_file_diff: str):
+    test_steps = read_test_steps(test_path)
+
+    pipeline_generator_config = PipelineGeneratorConfig(
+        run_all=run_all == "1",
+        list_file_diff=list_file_diff,
+        container_registry=VLLM_ECR_URL,
+        container_registry_repo=VLLM_ECR_REPO,
+        commit=os.getenv("BUILDKITE_COMMIT"),
+    )

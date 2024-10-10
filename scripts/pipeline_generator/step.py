@@ -58,8 +58,8 @@ class TestStep(BaseModel):
 class BuildkiteStep(BaseModel):
     """This class represents a step in Buildkite format."""
     label: str
-    agents: Dict[str, AgentQueue] = {"queue": AgentQueue.AWS_CPU}
-    commands: List[str]
+    agents: Dict[str, str] = {"queue": AgentQueue.AWS_CPU.value}
+    commands: Optional[List[str]] = None
     key: Optional[str] = None
     plugins: Optional[List[Dict]] = None
     parallelism: Optional[int] = None

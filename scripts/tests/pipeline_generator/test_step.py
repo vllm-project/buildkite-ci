@@ -106,32 +106,11 @@ def test_create_buildkite_step():
     assert buildkite_step.agents == {"queue": AgentQueue.AWS_CPU}
     assert buildkite_step.depends_on == "build"
 
-def test_create_buildkite_step_with_plugin():
-    buildkite_step = BuildkiteStep(
-        label="Test Step",
-        key="test-step",
-        plugins = [{"docker#v3.0.1": {"test": "plugin"}}],
-    )
-    assert buildkite_step.label == "Test Step"
-    assert buildkite_step.key == "test-step"
-    assert buildkite_step.agents == {"queue": AgentQueue.AWS_CPU}
-    assert buildkite_step.depends_on == "build"
-    assert buildkite_step.plugins == [{"docker#v3.0.1": {"test": "plugin"}}]
-
-def test_create_buildkite_step_fail_no_command_and_plugin():
-    with pytest.raises(ValidationError, match="Either 'commands' or 'plugins' must be defined"):
+def test_create_buildkite_step_fail_no_command():
+    with pytest.raises(ValidationError):
         buildkite_step = BuildkiteStep(
             label="Test Step",
             key="test-step",
-        )
-
-def test_create_buildkite_step_fail_both_command_and_plugin():
-    with pytest.raises(ValidationError, match="cannot be defined together"):
-        buildkite_step = BuildkiteStep(
-            label="Test Step",
-            key="test-step",
-            commands=["echo 'hello'"],
-            plugins=[{"docker#v3.0.1": {"test": "plugin"}}],
         )
 
 def test_create_buildkite_step_fail_wrong_agent_queue():

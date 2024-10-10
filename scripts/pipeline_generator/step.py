@@ -59,7 +59,7 @@ class BuildkiteStep(BaseModel):
     """This class represents a step in Buildkite format."""
     label: str
     agents: Dict[str, str] = {"queue": AgentQueue.AWS_CPU.value}
-    commands: Optional[List[str]] = None
+    commands: List[str]
     key: Optional[str] = None
     plugins: Optional[List[Dict]] = None
     parallelism: Optional[int] = None
@@ -67,16 +67,6 @@ class BuildkiteStep(BaseModel):
     depends_on: Optional[str] = "build"
     env: Optional[Dict[str, str]] = None
     retry: Optional[Dict[str, Any]] = None
-
-    @model_validator(mode="before")
-    @classmethod
-    def validate_command_plugin(cls, values) -> Any:
-        """Validate that either 'commands' or 'plugins' is defined."""
-        if not values.get("commands") and not values.get("plugins"):
-            raise ValueError("Either 'commands' or 'plugins' must be defined.")
-        if values.get("commands") and values.get("plugins"):
-            raise ValueError("Commands and plugins cannot be defined together.")
-        return values        
 
     @model_validator(mode="after")
     def validate_agent_queue(self) -> Self:

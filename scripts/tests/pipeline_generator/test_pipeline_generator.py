@@ -78,8 +78,10 @@ def test_write_buildkite_steps():
         output_file_path = os.path.join(temp_dir, "output.yaml")
         write_buildkite_steps(steps, output_file_path)
         with open(output_file_path, "r") as f:
-            output = yaml.safe_load(f)
-        assert output == expected_output
+            content = f.read()
+        with open(expected_output_path, "r") as f:
+            expected_content = f.read()
+        assert content == expected_content
         
 
 if __name__ == "__main__":

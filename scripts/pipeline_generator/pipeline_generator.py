@@ -22,7 +22,7 @@ class PipelineGeneratorConfig:
         self.container_registry = container_registry
         self.container_registry_repo = container_registry_repo
         self.commit = commit
-    
+
     @property
     def container_image(self):
         return f"{self.container_registry}/{self.container_registry_repo}:{self.commit}"

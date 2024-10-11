@@ -1,12 +1,13 @@
 import click
 import os
 import re
+from typing import List, Optional, Union
 import yaml
-from typing import List, Optional
 from pydantic import BaseModel, field_validator
 
-from .step import TestStep
+from .step import BuildkiteStep, BuildkiteBlockStep, TestStep
 from .utils import VLLM_ECR_URL, VLLM_ECR_REPO
+
 class PipelineGeneratorConfig:
     def __init__(
         self,
@@ -21,7 +22,7 @@ class PipelineGeneratorConfig:
         self.container_registry = container_registry
         self.container_registry_repo = container_registry_repo
         self.commit = commit
-    
+
     @property
     def container_image(self):
         return f"{self.container_registry}/{self.container_registry_repo}:{self.commit}"
@@ -42,11 +43,18 @@ class PipelineGenerator:
         config.validate()
         self.config = config
 
+
 def read_test_steps(file_path: str) -> List[TestStep]:
     """Read test steps from test pipeline yaml and parse them into TestStep objects."""
     with open(file_path, "r") as f:
         content = yaml.safe_load(f)
     return [TestStep(**step) for step in content["steps"]]
+
+def write_buildkite_steps(steps: List[Union[BuildkiteStep, BuildkiteBlockStep]], file_path: str) -> None:
+    """Write the buildkite steps to the Buildkite pipeline yaml file."""
+    buildkite_steps_dict = {"steps": [step.dict(exclude_none=True) for step in steps]}
+    with open(file_path, "w") as f:
+        yaml.dump(buildkite_steps_dict, f, sort_keys=False)
 
 @click.command()
 @click.option("--test_path", type=str, required=True, help="Path to the test pipeline yaml file")

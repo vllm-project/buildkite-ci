@@ -59,7 +59,7 @@ class BuildkiteStep(BaseModel):
     """This class represents a step in Buildkite format."""
     label: str
     agents: Dict[str, str] = {"queue": AgentQueue.AWS_CPU.value}
-    commands: Optional[List[str]] = None
+    commands: List[str]
     key: Optional[str] = None
     plugins: Optional[List[Dict]] = None
     parallelism: Optional[int] = None
@@ -68,12 +68,18 @@ class BuildkiteStep(BaseModel):
     env: Optional[Dict[str, str]] = None
     retry: Optional[Dict[str, Any]] = None
 
+    @model_validator(mode="after")
+    def validate_agent_queue(self) -> Self:
+        queue = self.agents.get("queue")
+        if not AgentQueue(queue):
+            raise ValueError(f"Invalid agent queue: {queue}")
+
 
 class BuildkiteBlockStep(BaseModel):
     """This class represents a block step in Buildkite format."""
     block: str
-    depends_on: Optional[str] = BUILD_STEP_KEY
     key: str
+    depends_on: Optional[str] = BUILD_STEP_KEY
 
 
 def get_step_key(step_label: str) -> str:

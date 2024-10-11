@@ -13,8 +13,8 @@ steps:
   - command3
   depends_on: build
 - block: Run Test 3
-  depends_on: build
   key: block-test-3
+  depends_on: build
 - label: Test 3
   agents:
     queue: cpu_queue

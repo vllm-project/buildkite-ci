@@ -32,6 +32,13 @@ steps:
     command: bash .buildkite/run-neuron-test.sh
     soft_fail: false
 
+  - label: "Python-only Development Test"
+    depends_on: image-build
+    agents:
+      queue: small_cpu_queue
+    command: bash .buildkite/run-code-dev-test.sh
+    soft_fail: true
+
   {% for step in steps %}
   {% if step.gpu != "a100" and step.fast_check == true and step.num_nodes < 2 %}
   - label: "{{ step.label }}"

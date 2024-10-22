@@ -67,6 +67,9 @@ steps:
     {% else %}
     depends_on: image-build
     {% endif %}
+    {% if step.nightly %}
+    if: build.env("RUN_ALL") == 1
+    {% endif %}
     agents:
       {% if step.label == "Documentation Build" %}
       queue: small_cpu_queue

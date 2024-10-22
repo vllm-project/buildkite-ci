@@ -68,7 +68,7 @@ steps:
     depends_on: image-build
     {% endif %}
     {% if step.nightly %}
-    if: build.env("NIGHTLY") == 1
+    if: build.env("NIGHTLY") and build.env("NIGHTLY") == "1"
     {% endif %}
     agents:
       {% if step.label == "Documentation Build" %}

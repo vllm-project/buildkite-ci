@@ -90,7 +90,7 @@ steps:
       - command nvidia-smi || true
       - export VLLM_LOGGING_LEVEL=DEBUG
       - export VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1
-      - cd {{ (step.working_dir or default_working_dir) | safe
+      - cd {{ (step.working_dir or default_working_dir) | safe }}
       - {{ step.command  or (step.commands | join(' && ')) | safe }}
     {% endif %}
     soft_fail: {{ step.soft_fail or false }}

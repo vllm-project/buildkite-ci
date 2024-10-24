@@ -7,6 +7,7 @@ from pydantic import BaseModel, field_validator
 
 from .step import BuildkiteStep, BuildkiteBlockStep, TestStep
 from .utils import VLLM_ECR_URL, VLLM_ECR_REPO
+from .pipeline_generator_helper import convert_test_step_to_buildkite_step
 
 class PipelineGeneratorConfig:
     def __init__(
@@ -43,18 +44,6 @@ class PipelineGenerator:
         config.validate()
         self.config = config
 
-    def convert_test_step_to_buildkite_steps(self, step: TestStep) -> List[Union[BuildkiteStep, BuildkiteBlockStep]]:
-        """Process test step and return corresponding BuildkiteStep."""
-        steps = []
-        current_step = create_buildkite_step(step, self.config.container_image)
-
-        if not step_should_run(step, self.config.run_all, self.config.list_file_diff):
-            block_step = get_block_step(step.label)
-            steps.append(block_step)
-            current_step.depends_on = block_step.key
-
-        steps.append(current_step)
-        return steps
 
 def read_test_steps(file_path: str) -> List[TestStep]:
     """Read test steps from test pipeline yaml and parse them into TestStep objects."""

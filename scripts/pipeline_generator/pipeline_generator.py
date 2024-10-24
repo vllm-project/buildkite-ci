@@ -7,7 +7,6 @@ from pydantic import BaseModel, field_validator
 
 from .step import BuildkiteStep, BuildkiteBlockStep, TestStep
 from .utils import VLLM_ECR_URL, VLLM_ECR_REPO
-from .pipeline_generator_helper import convert_test_step_to_buildkite_step
 
 class PipelineGeneratorConfig:
     def __init__(

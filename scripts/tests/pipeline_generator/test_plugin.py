@@ -11,7 +11,6 @@ from scripts.pipeline_generator.plugin import (
 
 def test_get_kubernetes_plugin_config():
     docker_image_path = "test_image:latest"
-    test_bash_command = ["echo", "Hello, Kubernetes!"]
     num_gpus = 1
 
     expected_config = {
@@ -20,7 +19,6 @@ def test_get_kubernetes_plugin_config():
                 "containers": [
                     {
                         "image": docker_image_path,
-                        "command": [" ".join(test_bash_command)],
                         "resources": {"limits": {"nvidia.com/gpu": num_gpus}},
                         "volumeMounts": [
                             {"name": "devshm", "mountPath": "/dev/shm"},
@@ -51,23 +49,22 @@ def test_get_kubernetes_plugin_config():
         }
     }
 
-    assert get_kubernetes_plugin_config(docker_image_path, test_bash_command, num_gpus) == expected_config
+    assert get_kubernetes_plugin_config(docker_image_path, num_gpus) == expected_config
 
 
 @pytest.mark.parametrize(
-    "docker_image_path, test_bash_command, no_gpu, expected_config",
+    "docker_image_path, no_gpu, expected_config",
     [
         (
             "test_image:latest",
-            ["bash", "-c", "echo A;\npytest -v -s a.py"],
             False,
             {
                 DOCKER_PLUGIN_NAME: {
                     "image": "test_image:latest",
                     "always-pull": True,
                     "propagate-environment": True,
+                    "shell": ["/bin/bash", "-c"],
                     "gpus": "all",
-                    "command": ["bash", "-c", "echo A;\npytest -v -s a.py"],
                     "environment": [
                         "HF_HOME=/root/.cache/huggingface",
                         "VLLM_USAGE_SOURCE=ci-test",
@@ -84,14 +81,13 @@ def test_get_kubernetes_plugin_config():
         ),
         (
             "cpu_image:latest",
-            ["bash", "-c", "echo B;\npytest -v -s b.py"],
             True,
             {
                 DOCKER_PLUGIN_NAME: {
                     "image": "cpu_image:latest",
                     "always-pull": True,
                     "propagate-environment": True,
-                    "command": ["bash", "-c", "echo B;\npytest -v -s b.py"],
+                    "shell": ["/bin/bash", "-c"],
                     "environment": [
                         "HF_HOME=/root/.cache/huggingface",
                         "VLLM_USAGE_SOURCE=ci-test",
@@ -108,8 +104,8 @@ def test_get_kubernetes_plugin_config():
         ),
     ]
 )
-def test_get_docker_plugin_config(docker_image_path, test_bash_command, no_gpu, expected_config):
-    assert get_docker_plugin_config(docker_image_path, test_bash_command, no_gpu) == expected_config
+def test_get_docker_plugin_config(docker_image_path, no_gpu, expected_config):
+    assert get_docker_plugin_config(docker_image_path, no_gpu) == expected_config
 
 
 if __name__ == "__main__":

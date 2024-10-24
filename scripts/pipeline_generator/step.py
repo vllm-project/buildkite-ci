@@ -39,7 +39,7 @@ class TestStep(BaseModel):
             values["commands"] = [values["command"]]
             del values["command"]
         return values
-    
+
     @model_validator(mode="after")
     def validate_gpu(self) -> Self:
         if self.gpu and self.no_gpu:

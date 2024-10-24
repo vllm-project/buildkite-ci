@@ -54,6 +54,7 @@ class DockerPluginConfig(BaseModel):
     command: List[str] = Field(default_factory=list)
     environment: List[str] = DEFAULT_DOCKER_ENVIRONMENT_VARIBLES
     volumes: List[str] = DEFAULT_DOCKER_VOLUMES
+    shell: List[str] = ["/bin/bash", "-c"]
 
 
 class KubernetesPodContainerConfig(BaseModel):
@@ -94,12 +95,11 @@ class KubernetesPluginConfig(BaseModel):
     pod_spec: KubernetesPodSpec = Field(alias="podSpec")
 
 
-def get_kubernetes_plugin_config(container_image: str, test_bash_command: List[str], num_gpus: int) -> Dict:
+def get_kubernetes_plugin_config(container_image: str, num_gpus: int) -> Dict:
     pod_spec = KubernetesPodSpec(
         containers=[
             KubernetesPodContainerConfig(
                 image=container_image,
-                command=[" ".join(test_bash_command)],
                 resources={"limits": {"nvidia.com/gpu": num_gpus}}
             )
         ]
@@ -107,10 +107,9 @@ def get_kubernetes_plugin_config(container_image: str, test_bash_command: List[s
     return {KUBERNETES_PLUGIN_NAME: KubernetesPluginConfig(podSpec=pod_spec).dict(by_alias=True)}
 
 
-def get_docker_plugin_config(docker_image_path: str, test_bash_command: List[str], no_gpu: bool) -> Dict:
+def get_docker_plugin_config(docker_image_path: str, no_gpu: bool) -> Dict:
     docker_plugin_config = DockerPluginConfig(
         image=docker_image_path,
-        command=test_bash_command
     )
     if no_gpu:
         docker_plugin_config.gpus = None

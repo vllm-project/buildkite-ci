@@ -134,10 +134,6 @@ steps:
             priorityClassName: ci
             containers:
             - image: {{ docker_image }}
-              command: ["bash"]
-              args:
-              - '-c'
-              - "'(command nvidia-smi || true) && export VLLM_LOGGING_LEVEL=DEBUG && export VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1 && cd {{ (step.working_dir or default_working_dir) | safe }} && {{ step.command or (step.commands | join(' && ')) | safe }}'"
               resources:
                 limits:
                   nvidia.com/gpu: {{ step.num_gpus or 1 }}

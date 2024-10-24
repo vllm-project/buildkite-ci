@@ -54,6 +54,7 @@ class DockerPluginConfig(BaseModel):
     command: List[str] = Field(default_factory=list)
     environment: List[str] = DEFAULT_DOCKER_ENVIRONMENT_VARIBLES
     volumes: List[str] = DEFAULT_DOCKER_VOLUMES
+    shell: List[str] = ["/bin/bash", "-c"]
 
 
 class KubernetesPodContainerConfig(BaseModel):

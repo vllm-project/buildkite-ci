@@ -6,7 +6,8 @@ import yaml
 from pydantic import BaseModel, field_validator
 
 from .step import BuildkiteStep, BuildkiteBlockStep, TestStep
-from .utils import VLLM_ECR_URL, VLLM_ECR_REPO
+from .utils import VLLM_ECR_URL, VLLM_ECR_REPO, AgentQueue
+from .pipeline_generator_helper import get_build_commands
 
 class PipelineGeneratorConfig:
     def __init__(
@@ -43,6 +44,24 @@ class PipelineGenerator:
         config.validate()
         self.config = config
 
+    def generate_build_step(self) -> BuildkiteStep:
+        """Build the Docker image and push it to container registry."""
+        build_commands = get_build_commands(self.config.container_registry, self.config.commit, self.config.container_image)
+
+        return BuildkiteStep(
+            label=":docker: build image",
+            key="build",
+            agents={"queue": AgentQueue.AWS_CPU.value},
+            env={"DOCKER_BUILDKIT": "1"},
+            retry={
+                "automatic": [
+                    {"exit_status": -1, "limit": 2},
+                    {"exit_status": -10, "limit": 2}
+                ]
+            },
+            commands=build_commands,
+            depends_on=None,
+        )
 
 def read_test_steps(file_path: str) -> List[TestStep]:
     """Read test steps from test pipeline yaml and parse them into TestStep objects."""

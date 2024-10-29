@@ -22,5 +22,6 @@ fi
         f"--target test "
         f"--progress plain ."
     )
+    # TODO: Stop using . in docker build command
     docker_push_command = f"docker push {container_image}"
     return [ecr_login_command, image_check_command, docker_build_command, docker_push_command]

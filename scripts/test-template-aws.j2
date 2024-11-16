@@ -223,6 +223,7 @@ steps:
     command: bash .buildkite/run-cpu-test.sh
 
   - block: "Run Intel HPU Test"
+    depends_on: ~
     key: block-intel-hpu
 
   - label: "Intel HPU Test"

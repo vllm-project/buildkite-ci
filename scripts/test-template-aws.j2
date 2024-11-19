@@ -39,6 +39,10 @@ steps:
   {% set ns.blocked = 0 %}
   {% endif %}
 
+  {% if $NIGHTLY == "1" %}
+  {% set ns.blocked = 0 %}
+  {% endif %}
+
   {% if step.source_file_dependencies %}
     {% for source_file in step.source_file_dependencies %}
       {% for file in list_file_diff %}
@@ -55,14 +59,14 @@ steps:
   {% set ns.blocked = 1 %}
   {% endif %}
 
-  {% if ns.blocked == 1 or (step.optional and build.env("NIGHTLY") != "1") %}
+  {% if ns.blocked == 1 or (step.optional and $NIGHTLY != "1") %}
   - block: "Run {{ step.label }}"
     depends_on: image-build
     key: block-{{ step.label | replace(" ", "-") | lower | replace("(", "") | replace(")", "") | replace("%", "") | replace(",", "-") }}
   {% endif %}
 
   - label: "{{ step.label }}"
-    {% if ns.blocked == 1 or (step.optional and build.env("NIGHTLY") != "1") %}
+    {% if ns.blocked == 1 or (step.optional and $NIGHTLY != "1") %}
     depends_on: block-{{ step.label | replace(" ", "-") | lower | replace("(", "") | replace(")", "") | replace("%", "") | replace(",", "-") }}
     {% else %}
     depends_on: image-build

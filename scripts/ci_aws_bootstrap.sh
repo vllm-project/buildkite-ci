@@ -36,6 +36,7 @@ upload_pipeline() {
     cd .buildkite
     echo "List file diff: $LIST_FILE_DIFF"
     echo "Run all: $RUN_ALL"
+    echo "NIGHTLY: $NIGHTLY"
     minijinja-cli test-template.j2 test-pipeline.yaml -D list_file_diff="$LIST_FILE_DIFF" -D run_all="$RUN_ALL" > pipeline.yml
     buildkite-agent pipeline upload pipeline.yml
     exit 0

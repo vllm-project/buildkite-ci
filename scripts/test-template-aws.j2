@@ -55,22 +55,6 @@ steps:
     {% set ns.blocked = 0 %}
   {% endif %}
 
-  {% if step.optional %}
-  - label: "{{ step.label }}"
-    depends_on: ~
-    agents:
-      queue: gpu_1_queue
-    command: echo 'Optional'
-  {% endif %}
-
-  {% if step.optional and nightly == "1" %}
-  - label: "{{ step.label }}"
-    depends_on: ~
-    agents:
-      queue: gpu_1_queue
-    command: echo 'Optional and nightly'
-  {% endif %}
-
   {% if ns.blocked == 1 or (step.optional and nightly != "1") %}
   - block: "Run {{ step.label }}"
     depends_on: image-build

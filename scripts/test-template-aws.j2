@@ -65,6 +65,7 @@ steps:
     agents:
       queue: gpu_1_queue
     command: echo 'Optional'
+  {% endif %}
 
   {% if step.optional and nightly == "1" %}
   - label: "{{ step.label }}"
@@ -72,6 +73,7 @@ steps:
     agents:
       queue: gpu_1_queue
     command: echo 'Optional and nightly'
+  {% endif %}
 
   {% if ns.blocked == 1 or (step.optional and nightly != "1") %}
   - block: "Run {{ step.label }}"

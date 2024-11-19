@@ -6,6 +6,10 @@ if [[ -z "${RUN_ALL:-}" ]]; then
     RUN_ALL=0
 fi
 
+if [[ -z "${NIGHTLY:-}" ]]; then
+    NIGHTLY=0
+fi
+
 upload_pipeline() {
     echo "Uploading pipeline..."
     ls .buildkite || buildkite-agent annotate --style error 'Please merge upstream main branch for buildkite CI'
@@ -25,7 +29,7 @@ upload_pipeline() {
     fi
     if [ -e ".buildkite/pipeline_generator/pipeline_generator.py" ]; then
         python -m pip install click pydantic
-        python .buildkite/pipeline_generator/pipeline_generator.py --run_all=$RUN_ALL --list_file_diff="$LIST_FILE_DIFF"
+        python .buildkite/pipeline_generator/pipeline_generator.py --run_all=$RUN_ALL --list_file_diff="$LIST_FILE_DIFF" --nightly="$NIGHTLY"
         buildkite-agent pipeline upload .buildkite/pipeline.yaml
         exit 0
     fi

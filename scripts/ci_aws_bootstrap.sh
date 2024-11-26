@@ -25,7 +25,6 @@ upload_pipeline() {
         exit 0
     fi
     if [ ! -e ".buildkite/test-template.j2" ]; then
-        echo "test-cluster"
         curl -o .buildkite/test-template.j2 https://raw.githubusercontent.com/vllm-project/buildkite-ci/main/scripts/test-template-aws.j2?$(date +%s)
     fi
     if [ -e ".buildkite/pipeline_generator/pipeline_generator.py" ]; then
@@ -34,9 +33,7 @@ upload_pipeline() {
         buildkite-agent pipeline upload .buildkite/pipeline.yaml
         exit 0
     fi
-    echo "Generating pipeline"
     cd .buildkite
-    echo "Branch: $BUILDKITE_BRANCH"
     echo "List file diff: $LIST_FILE_DIFF"
     echo "Run all: $RUN_ALL"
     echo "Nightly: $NIGHTLY"

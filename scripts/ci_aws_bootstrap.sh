@@ -25,6 +25,7 @@ upload_pipeline() {
         exit 0
     fi
     if [ ! -e ".buildkite/test-template.j2" ]; then
+        echo "test-cluster"
         curl -o .buildkite/test-template.j2 https://raw.githubusercontent.com/vllm-project/buildkite-ci/test_cluster/scripts/test-template-aws.j2?$(date +%s)
     fi
     if [ -e ".buildkite/pipeline_generator/pipeline_generator.py" ]; then

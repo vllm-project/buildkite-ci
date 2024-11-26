@@ -34,6 +34,7 @@ upload_pipeline() {
         buildkite-agent pipeline upload .buildkite/pipeline.yaml
         exit 0
     fi
+    echo "Generating pipeline"
     cd .buildkite
     echo "List file diff: $LIST_FILE_DIFF"
     echo "Run all: $RUN_ALL"

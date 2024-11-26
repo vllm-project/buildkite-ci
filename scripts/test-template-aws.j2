@@ -17,7 +17,7 @@ steps:
     commands:
       - "echo $BUILDKITE_BRANCH"
       - "echo branch"
-      {% if "$BUILDKITE_BRANCH" == "main" %}
+      {% if "$BUILDKITE_BRANCH" == "test_ci" %}
       - "echo BRR"
       {% endif %}
       - "aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/q9t5s3a7"

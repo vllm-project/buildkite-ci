@@ -8,7 +8,7 @@ steps:
   - label: ":docker: build image"
     key: image-build
     agents:
-      {% if "$BUILDKITE_BRANCH" == "main" %}
+      {% if $BUILDKITE_BRANCH == "main" %}
       queue: cpu_queue_postmerge
       {% else %}
       queue: cpu_queue_premerge

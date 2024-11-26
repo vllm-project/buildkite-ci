@@ -196,7 +196,7 @@ steps:
         depends_on: 
           - "amd-build"
         agents:
-          queue: amd
+          queue: amd_gpu
         command: bash .buildkite/run-amd-test.sh "(command rocm-smi || true) && export VLLM_LOGGING_LEVEL=DEBUG && export VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1 && cd {{ (step.working_dir or default_working_dir) | safe  }} ; {{ step.command  or (step.commands | join(" && ")) | safe }}"
         env:
           DOCKER_BUILDKIT: "1"
@@ -238,7 +238,7 @@ steps:
     depends_on: block-ibm-test
     soft_fail: true
     agents:
-      queue: ppc64le
+      queue: ibm-ppc64le
     command: bash .buildkite/run-cpu-test-ppc64le.sh
 
   - label: "Intel GPU Test"
@@ -251,7 +251,7 @@ steps:
   - label: "TPU Test"
     depends_on: ~
     agents:
-      queue: tpu
+      queue: tpu_queue
     commands: 
     - if [[ -f ".buildkite/run-tpu-test.sh" ]]; then bash .buildkite/run-tpu-test.sh; fi 
     - yes | docker system prune -a

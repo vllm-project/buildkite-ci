@@ -8,7 +8,11 @@ steps:
   - label: ":docker: build image"
     key: image-build
     agents:
-      queue: cpu_queue
+      {% if "$BUILDKITE_BRANCH" == "main" %}
+      queue: cpu_queue_postmerge
+      {% else %}
+      queue: cpu_queue_premerge
+      {% endif %}
     commands:
       - "aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/q9t5s3a7"
       - |
@@ -69,9 +73,9 @@ steps:
     {% endif %}
     agents:
       {% if step.label == "Documentation Build" %}
-      queue: small_cpu_queue
+      queue: small_cpu_queue_premerge
       {% elif step.no_gpu %}
-      queue: cpu_queue
+      queue: cpu_queue_premerge
       {% elif step.gpu == "a100" %}
       queue: a100-queue
       {% elif step.num_gpus == 2 or step.num_gpus == 4 %}

@@ -36,6 +36,7 @@ upload_pipeline() {
     fi
     echo "Generating pipeline"
     cd .buildkite
+    echo "Branch: $BUILDKITE_BRANCH"
     echo "List file diff: $LIST_FILE_DIFF"
     echo "Run all: $RUN_ALL"
     echo "Nightly: $NIGHTLY"

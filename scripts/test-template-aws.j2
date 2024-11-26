@@ -212,19 +212,38 @@ steps:
     command: bash .buildkite/run-neuron-test.sh
     soft_fail: true
 
-  - label: "Intel CPU Test"
+  - block: "Run Intel CPU Test"
+    key: block-intel-cpu
     depends_on: ~
+
+  - label: "Intel CPU Test"
+    depends_on: block-intel-cpu
     soft_fail: true
     agents:
       queue: intel-cpu
     command: bash .buildkite/run-cpu-test.sh
 
-  - label: "Intel HPU Test"
+  - block: "Run Intel HPU Test"
+    key: block-intel-hpu
     depends_on: ~
+
+  - label: "Intel HPU Test"
+    depends_on: block-intel-hpu
     soft_fail: true
     agents:
       queue: intel-hpu
     command: bash .buildkite/run-hpu-test.sh
+
+  - block: "Run Intel GPU Test"
+    key: block-intel-gpu
+    depends_on: ~
+
+  - label: "Intel GPU Test"
+    soft_fail: true
+    depends_on: block-intel-gpu
+    agents:
+      queue: intel-gpu
+    command: bash .buildkite/run-xpu-test.sh
 
   - block: "Run IBM Power CPU Test"
     key: block-ibm-test
@@ -236,13 +255,6 @@ steps:
     agents:
       queue: ppc64le
     command: bash .buildkite/run-cpu-test-ppc64le.sh
-
-  - label: "Intel GPU Test"
-    soft_fail: true
-    depends_on: ~
-    agents:
-      queue: intel-gpu
-    command: bash .buildkite/run-xpu-test.sh
 
   - label: "TPU Test"
     depends_on: ~

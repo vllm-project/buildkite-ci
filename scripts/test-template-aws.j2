@@ -77,7 +77,7 @@ steps:
       {% elif step.no_gpu %}
       queue: cpu_queue_premerge
       {% elif step.gpu == "a100" %}
-      queue: a100-queue
+      queue: a100_queue
       {% elif step.num_gpus == 2 or step.num_gpus == 4 %}
       queue: gpu_4_queue
       {% else %}

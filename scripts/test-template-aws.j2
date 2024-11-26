@@ -2,7 +2,6 @@
 {% set docker_image_amd = "rocm/vllm-ci:$BUILDKITE_COMMIT" %}
 {% set default_working_dir = "/vllm-workspace/tests" %}
 {% set hf_home = "/root/.cache/huggingface" %}
-{% set branch = "$BUILDKITE_BRANCH" %}
 {% set list_file_diff = list_file_diff | split("|") %}
 
 steps:

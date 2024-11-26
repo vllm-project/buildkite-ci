@@ -2,13 +2,14 @@
 {% set docker_image_amd = "rocm/vllm-ci:$BUILDKITE_COMMIT" %}
 {% set default_working_dir = "/vllm-workspace/tests" %}
 {% set hf_home = "/root/.cache/huggingface" %}
+{% set branch = "$BUILDKITE_BRANCH" %}
 {% set list_file_diff = list_file_diff | split("|") %}
 
 steps:
   - label: ":docker: build image"
     key: image-build
     agents:
-      {% if $BUILDKITE_BRANCH == "main" %}
+      {% if branch == "main" %}
       queue: cpu_queue_postmerge
       {% else %}
       queue: cpu_queue_premerge
@@ -115,7 +116,7 @@ steps:
             - VLLM_USAGE_SOURCE=ci-test
             - HF_HOME={{ hf_home }}
             - HF_TOKEN
-            {% if "$BUILDKITE_BRANCH" == "main" %}
+            {% if branch == "main" %}
             - BUILDKITE_ANALYTICS_TOKEN
             {% endif %}
             {% if step.label == "Speculative decoding tests" %}

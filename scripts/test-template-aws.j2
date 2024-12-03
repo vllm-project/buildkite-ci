@@ -1,4 +1,7 @@
 {% set docker_image = "public.ecr.aws/q9t5s3a7/vllm-ci-test-repo:$BUILDKITE_COMMIT" %}
+{% if branch == "main" %}
+{% set docker_image = "public.ecr.aws/q9t5s3a7/vllm-ci-postmerge-repo:$BUILDKITE_COMMIT" %}
+{% endif %}
 {% set docker_image_amd = "rocm/vllm-ci:$BUILDKITE_COMMIT" %}
 {% set default_working_dir = "/vllm-workspace/tests" %}
 {% set hf_home = "/root/.cache/huggingface" %}
@@ -185,6 +188,8 @@ steps:
               limit: 2
             - exit_status: -10  # Agent was lost
               limit: 2
+            - exit_status: 1  # Machine occasionally fail
+              limit: 2
         agents:
           queue: amd-cpu
 
@@ -204,6 +209,15 @@ steps:
         {% else %}
         soft_fail: false
         {% endif %}
+        retry:
+          automatic:
+            - exit_status: -1  # Agent was lost
+              limit: 2
+            - exit_status: -10  # Agent was lost
+              limit: 2
+            - exit_status: 1  # Machine occasionally fail
+              limit: 2
+        
     {% endif %}
     {% endfor %}
     

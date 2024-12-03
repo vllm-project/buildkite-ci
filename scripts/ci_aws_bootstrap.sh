@@ -25,7 +25,7 @@ upload_pipeline() {
         exit 0
     fi
     if [ ! -e ".buildkite/test-template.j2" ]; then
-        curl -o .buildkite/test-template.j2 https://raw.githubusercontent.com/vllm-project/buildkite-ci/main/scripts/test-template-aws.j2
+        curl -o .buildkite/test-template.j2 https://raw.githubusercontent.com/vllm-project/buildkite-ci/main/scripts/test-template-aws.j2?$(date +%s)
     fi
     if [ -e ".buildkite/pipeline_generator/pipeline_generator.py" ]; then
         python -m pip install click pydantic
@@ -37,7 +37,8 @@ upload_pipeline() {
     echo "List file diff: $LIST_FILE_DIFF"
     echo "Run all: $RUN_ALL"
     echo "Nightly: $NIGHTLY"
-    minijinja-cli test-template.j2 test-pipeline.yaml -D list_file_diff="$LIST_FILE_DIFF" -D run_all="$RUN_ALL" -D nightly="$NIGHTLY" > pipeline.yml
+    minijinja-cli test-template.j2 test-pipeline.yaml -D branch="$BUILDKITE_BRANCH" -D list_file_diff="$LIST_FILE_DIFF" -D run_all="$RUN_ALL" -D nightly="$NIGHTLY" > pipeline.yml
+    cat pipeline.yml
     buildkite-agent pipeline upload pipeline.yml
     exit 0
 }

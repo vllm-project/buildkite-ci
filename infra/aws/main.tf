@@ -101,6 +101,7 @@ locals {
       InstanceOperatingSystem              = "linux"
       OnDemandPercentage                   = 100
       EnableInstanceStorage                = "true"
+      BuildkiteTerminateInstanceAfterJob   = true
     }
 
     cpu-queue-postmerge = {
@@ -112,6 +113,7 @@ locals {
       InstanceOperatingSystem              = "linux"
       OnDemandPercentage                   = 100
       EnableInstanceStorage                = "true"
+      BuildkiteTerminateInstanceAfterJob   = true
     }
   }
 
@@ -277,9 +279,9 @@ resource "aws_cloudformation_stack" "bk_queue" {
   }
 }
 
-resource "aws_iam_policy" "ecr_public_read_access_policy" {
-  name        = "ecr-public-read-access-policy"
-  description = "Policy to pull images from ECR"
+resource "aws_iam_policy" "premerge_ecr_public_read_access_policy" {
+  name        = "premerge-ecr-public-read-access-policy"
+  description = "Policy to pull images from premerge ECR"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -300,9 +302,64 @@ resource "aws_iam_policy" "ecr_public_read_access_policy" {
   })
 }
 
-resource "aws_iam_policy" "ecr_public_write_access_policy" {
-  name        = "ecr-public-write-access-policy"
-  description = "Policy to push and pull images from ECR"
+resource "aws_iam_policy" "premerge_ecr_public_write_access_policy" {
+  name        = "premerge-ecr-public-write-access-policy"
+  description = "Policy to push and pull images from premerge ECR"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action = [
+        "ecr-public:BatchCheckLayerAvailability",
+        "ecr-public:CompleteLayerUpload",
+        "ecr-public:DescribeImageTags",
+        "ecr-public:DescribeImages",
+        "ecr-public:DescribeRegistries", 
+        "ecr-public:DescribeRepositories",
+        "ecr-public:GetAuthorizationToken",
+        "ecr-public:GetRegistryCatalogData",
+        "ecr-public:GetRepositoryCatalogData",
+        "ecr-public:GetRepositoryPolicy",
+        "ecr-public:InitiateLayerUpload",
+        "ecr-public:ListTagsForResource",
+        "ecr-public:PutImage",
+        "ecr-public:PutRegistryCatalogData",
+        "ecr-public:TagResource",
+        "ecr-public:UploadLayerPart",
+        "sts:GetServiceBearerToken"
+      ]
+      Resource = "*"
+    }]
+  })
+}
+
+resource "aws_iam_policy" "postmerge_ecr_public_read_access_policy" {
+  name        = "postmerge-ecr-public-read-access-policy"
+  description = "Policy to pull images from postmerge ECR"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action = [
+        "ecr-public:GetAuthorizationToken",
+        "ecr-public:BatchCheckLayerAvailability", 
+        "ecr-public:GetDownloadUrlForLayer",
+        "ecr-public:GetRepositoryCatalogData",
+        "ecr-public:DescribeRepositories",
+        "ecr-public:DescribeImageTags",
+        "ecr-public:DescribeRegistries",
+        "sts:GetServiceBearerToken"
+      ]
+      Resource = "*"
+    }]
+  })
+}
+
+resource "aws_iam_policy" "postmerge_ecr_public_read_write_access_policy" {
+  name        = "postmerge-ecr-public-read-write-access-policy"
+  description = "Policy to push and pull images from postmerge ECR"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -404,22 +461,38 @@ resource "aws_iam_policy" "vllm_wheels_bucket_read_write_access" {
   })
 }
 
-resource "aws_iam_role_policy_attachment" "ecr_public_read_access" {
+resource "aws_iam_role_policy_attachment" "premerge_ecr_public_read_access" {
   for_each   = merge(
-    aws_cloudformation_stack.bk_queue_premerge,
     aws_cloudformation_stack.bk_queue_ci_gpu
   )
   role       = each.value.outputs.InstanceRoleName
-  policy_arn = aws_iam_policy.ecr_public_read_access_policy.arn
+  policy_arn = aws_iam_policy.premerge_ecr_public_read_access_policy.arn
 }
 
-resource "aws_iam_role_policy_attachment" "ecr_public_write_access" {
+resource "aws_iam_role_policy_attachment" "premerge_ecr_public_write_access" {
   for_each   = merge(
     aws_cloudformation_stack.bk_queue,
+    aws_cloudformation_stack.bk_queue_premerge,
     aws_cloudformation_stack.bk_queue_postmerge
   )
   role       = each.value.outputs.InstanceRoleName
-  policy_arn = aws_iam_policy.ecr_public_write_access_policy.arn
+  policy_arn = aws_iam_policy.premerge_ecr_public_write_access_policy.arn
+}
+
+resource "aws_iam_role_policy_attachment" "postmerge_ecr_public_read_access" {
+  for_each   = merge(
+    aws_cloudformation_stack.bk_queue_ci_gpu
+  )
+  role       = each.value.outputs.InstanceRoleName
+  policy_arn = aws_iam_policy.postmerge_ecr_public_read_access_policy.arn
+}
+
+resource "aws_iam_role_policy_attachment" "postmerge_ecr_public_read_write_access" {
+  for_each   = merge(
+    aws_cloudformation_stack.bk_queue_postmerge
+  )
+  role       = each.value.outputs.InstanceRoleName
+  policy_arn = aws_iam_policy.postmerge_ecr_public_read_write_access_policy.arn
 }
 
 resource "aws_iam_role_policy_attachment" "bk_stack_secrets_access" {
@@ -443,10 +516,16 @@ resource "aws_iam_role_policy_attachment" "bk_stack_sccache_bucket_read_access" 
 }
 
 resource "aws_iam_role_policy_attachment" "bk_stack_sccache_bucket_read_write_access" {
-  for_each = {
-    for k, v in aws_cloudformation_stack.bk_queue : k => v
-    if v.name == "bk-cpu-queue"
-  }
+  for_each = merge(
+    {
+      for k, v in aws_cloudformation_stack.bk_queue : k => v
+      if v.name == "bk-cpu-queue"
+    },
+    {
+      for k, v in aws_cloudformation_stack.bk_queue_postmerge : k => v
+      if v.name == "bk-cpu-queue-postmerge" 
+    }
+  )
   role       = each.value.outputs.InstanceRoleName
   policy_arn = aws_iam_policy.bk_stack_sccache_bucket_read_write_access.arn
 }

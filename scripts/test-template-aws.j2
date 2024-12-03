@@ -185,6 +185,8 @@ steps:
               limit: 2
             - exit_status: -10  # Agent was lost
               limit: 2
+            - exit_status: 1  # Machine occasionally fail
+              limit: 2
         agents:
           queue: amd-cpu
 
@@ -204,6 +206,15 @@ steps:
         {% else %}
         soft_fail: false
         {% endif %}
+        retry:
+          automatic:
+            - exit_status: -1  # Agent was lost
+              limit: 2
+            - exit_status: -10  # Agent was lost
+              limit: 2
+            - exit_status: 1  # Machine occasionally fail
+              limit: 2
+        
     {% endif %}
     {% endfor %}
     

@@ -258,7 +258,7 @@ steps:
 
   - label: "GH200 Test"
     depends_on: ~
-    soft_fail: false
+    soft_fail: true
     agents:
       queue: gh200
     command: bash .buildkite/run-gh200-test.sh

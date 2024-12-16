@@ -89,7 +89,13 @@ steps:
     {% if step.num_nodes >= 2%} {# for multi-node test #}
     commands:
       - ./.buildkite/run-multi-node-test.sh {{ (step.working_dir or default_working_dir) | safe  }} {{ step.num_nodes }} {{ step.num_gpus }} {{ docker_image }} {% for command in step.commands %}"{{ (command | join(" && ")) | safe }}" {% endfor %}
-    {% endif %}
+    {% else %}
+    commands:
+      - (command nvidia-smi || true)
+      - export VLLM_LOGGING_LEVEL=DEBUG
+      - export VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1
+      - cd {{ (step.working_dir or default_working_dir) | safe  }}
+      - {{ step.command  or (step.commands | join(' && ')) | safe }}
     soft_fail: {{ step.soft_fail or false }}
     {% if step.parallelism %}
     parallelism: {{ step.parallelism }}
@@ -113,7 +119,6 @@ steps:
           {% if step.label == "Benchmarks" %}
           mount-buildkite-agent: true
           {% endif %}
-          command: ["bash", "-xc", "(command nvidia-smi || true) && export VLLM_LOGGING_LEVEL=DEBUG && export VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1 && cd {{ (step.working_dir or default_working_dir) | safe  }} && {{ step.command  or (step.commands | join(' && ')) | safe }}"]
           environment:
             - VLLM_USAGE_SOURCE=ci-test
             - HF_HOME={{ hf_home }}
@@ -133,8 +138,6 @@ steps:
             priorityClassName: ci
             containers:
             - image: {{ docker_image }}
-              command:
-                - bash -c '(command nvidia-smi || true) && export VLLM_LOGGING_LEVEL=DEBUG && export VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1 && cd {{ (step.working_dir or default_working_dir) | safe }} && {{ step.command or (step.commands | join(' && ')) | safe }}'
               resources:
                 limits:
                   nvidia.com/gpu: {{ step.num_gpus or 1 }}

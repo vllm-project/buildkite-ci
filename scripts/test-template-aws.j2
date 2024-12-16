@@ -260,7 +260,7 @@ steps:
     depends_on: ~
     soft_fail: true
     agents:
-      queue: gh200
+      queue: gh200_queue
     command: bash .buildkite/run-gh200-test.sh
 
   - label: "TPU Test"

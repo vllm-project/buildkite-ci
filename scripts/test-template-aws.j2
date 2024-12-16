@@ -256,6 +256,13 @@ steps:
       queue: ibm-ppc64le
     command: bash .buildkite/run-cpu-test-ppc64le.sh
 
+  - label: "GH200 Test"
+    depends_on: ~
+    soft_fail: false
+    agents:
+      queue: gh200
+    command: bash .buildkite/run-gh200-test.sh
+
   - label: "TPU Test"
     depends_on: ~
     agents:

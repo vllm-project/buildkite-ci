@@ -145,13 +145,9 @@ steps:
               volumeMounts:
               - name: devshm
                 mountPath: /dev/shm
-              - name: hf-cache
-                mountPath: {{ hf_home }}
               env:
               - name: VLLM_USAGE_SOURCE
                 value: ci-test
-              - name: HF_HOME
-                value: {{ hf_home }}
               - name: HF_TOKEN
                 valueFrom:
                   secretKeyRef:
@@ -163,10 +159,6 @@ steps:
             - name: devshm
               emptyDir:
                 medium: Memory
-            - name: hf-cache
-              hostPath:
-                path: {{ hf_home }}
-                type: Directory
       {% endif %}
     {% endif %}
   {% endif %}

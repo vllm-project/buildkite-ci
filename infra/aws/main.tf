@@ -315,7 +315,7 @@ resource "aws_iam_policy" "premerge_ecr_public_write_access_policy" {
         "ecr-public:CompleteLayerUpload",
         "ecr-public:DescribeImageTags",
         "ecr-public:DescribeImages",
-        "ecr-public:DescribeRegistries", 
+        "ecr-public:DescribeRegistries",
         "ecr-public:DescribeRepositories",
         "ecr-public:GetAuthorizationToken",
         "ecr-public:GetRegistryCatalogData",
@@ -330,6 +330,14 @@ resource "aws_iam_policy" "premerge_ecr_public_write_access_policy" {
         "sts:GetServiceBearerToken"
       ]
       Resource = "arn:aws:ecr-public::936637512419:repository/vllm-ci-test-repo"
+    },
+    {
+      Effect   = "Allow"
+      Action = [
+        "ecr-public:GetAuthorizationToken",
+        "sts:GetServiceBearerToken"
+      ],
+      Resource = "*"
     }]
   })
 }
@@ -417,6 +425,38 @@ resource "aws_iam_policy" "release_ecr_public_read_write_access_policy" {
         "sts:GetServiceBearerToken"
       ]
       Resource = "arn:aws:ecr-public::936637512419:repository/vllm-release-repo"
+    }]
+  })
+}
+
+resource "aws_iam_policy" "cpu_release_ecr_public_read_write_access_policy" {
+  name        = "cpu-release-ecr-public-read-write-access-policy"
+  description = "Policy to push and pull images from release ECR"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action = [
+        "ecr-public:BatchCheckLayerAvailability",
+        "ecr-public:CompleteLayerUpload",
+        "ecr-public:DescribeImageTags",
+        "ecr-public:DescribeImages",
+        "ecr-public:DescribeRegistries", 
+        "ecr-public:DescribeRepositories",
+        "ecr-public:GetAuthorizationToken",
+        "ecr-public:GetRegistryCatalogData",
+        "ecr-public:GetRepositoryCatalogData",
+        "ecr-public:GetRepositoryPolicy",
+        "ecr-public:InitiateLayerUpload",
+        "ecr-public:ListTagsForResource",
+        "ecr-public:PutImage",
+        "ecr-public:PutRegistryCatalogData",
+        "ecr-public:TagResource",
+        "ecr-public:UploadLayerPart",
+        "sts:GetServiceBearerToken"
+      ]
+      Resource = "arn:aws:ecr-public::936637512419:repository/vllm-cpu-release-repo"
     }]
   })
 }
@@ -533,6 +573,14 @@ resource "aws_iam_role_policy_attachment" "release_ecr_public_read_write_access"
   )
   role       = each.value.outputs.InstanceRoleName
   policy_arn = aws_iam_policy.release_ecr_public_read_write_access_policy.arn
+}
+
+resource "aws_iam_role_policy_attachment" "cpu_release_ecr_public_read_write_access" {
+  for_each   = merge(
+    aws_cloudformation_stack.bk_queue_postmerge
+  )
+  role       = each.value.outputs.InstanceRoleName
+  policy_arn = aws_iam_policy.cpu_release_ecr_public_read_write_access_policy.arn
 }
 
 resource "aws_iam_role_policy_attachment" "bk_stack_secrets_access" {

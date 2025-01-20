@@ -236,8 +236,12 @@ steps:
       queue: intel-cpu
     command: bash .buildkite/run-cpu-test.sh
 
-  - label: "Intel HPU Test"
+  - block: "Run Intel HPU Test"
     depends_on: ~
+    key: block-hpu
+
+  - label: "Intel HPU Test"
+    depends_on: block-hpu
     soft_fail: true
     agents:
       queue: intel-hpu

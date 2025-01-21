@@ -267,7 +267,7 @@ steps:
     soft_fail: true
     agents:
       queue: gh200_queue
-    command: bash .buildkite/run-gh200-test.sh
+    command: nvidia-smi && bash .buildkite/run-gh200-test.sh
   {% endif %}
 
   - label: "TPU Test"

@@ -1,6 +1,8 @@
 {% set docker_image = "public.ecr.aws/q9t5s3a7/vllm-ci-test-repo:$BUILDKITE_COMMIT" %}
 {% if branch == "main" %}
 {% set docker_image = "public.ecr.aws/q9t5s3a7/vllm-ci-postmerge-repo:$BUILDKITE_COMMIT" %}
+{% set docker_image_cu121 = "public.ecr.aws/q9t5s3a7/vllm-ci-postmerge-repo:$BUILDKITE_COMMIT-cu121" %}
+{% set docker_image_cu118 = "public.ecr.aws/q9t5s3a7/vllm-ci-postmerge-repo:$BUILDKITE_COMMIT-cu118" %}
 {% endif %}
 {% set docker_image_amd = "rocm/vllm-ci:$BUILDKITE_COMMIT" %}
 {% set default_working_dir = "/vllm-workspace/tests" %}
@@ -55,14 +57,14 @@ steps:
       - "aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/q9t5s3a7"
       - |
         #!/bin/bash
-        if [[ -z $(docker manifest inspect {{ docker_image }}) ]]; then
+        if [[ -z $(docker manifest inspect {{ docker_image_cu121 }}) ]]; then
           echo "Image not found, proceeding with build..."
         else
           echo "Image found"
           exit 0
         fi
-      - "docker build --build-arg max_jobs=16 --build-arg buildkite_commit=$BUILDKITE_COMMIT --build-arg USE_SCCACHE=1 --build-arg CUDA_VERSION=12.1.0 --tag {{ docker_image }} --target test --progress plain ."
-      - "docker push {{ docker_image }}"
+      - "docker build --build-arg max_jobs=16 --build-arg buildkite_commit=$BUILDKITE_COMMIT --build-arg USE_SCCACHE=1 --build-arg CUDA_VERSION=12.1.0 --tag {{ docker_image_cu121 }} --target test --progress plain ."
+      - "docker push {{ docker_image_cu121 }}"
     env:
       DOCKER_BUILDKIT: "1"
     retry:
@@ -89,14 +91,14 @@ steps:
       - "aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/q9t5s3a7"
       - |
         #!/bin/bash
-        if [[ -z $(docker manifest inspect {{ docker_image }}) ]]; then
+        if [[ -z $(docker manifest inspect {{ docker_image_cu118 }}) ]]; then
           echo "Image not found, proceeding with build..."
         else
           echo "Image found"
           exit 0
         fi
-      - "docker build --build-arg max_jobs=16 --build-arg buildkite_commit=$BUILDKITE_COMMIT --build-arg USE_SCCACHE=1 --build-arg CUDA_VERSION=11.8.0 --tag {{ docker_image }} --target test --progress plain ."
-      - "docker push {{ docker_image }}"
+      - "docker build --build-arg max_jobs=16 --build-arg buildkite_commit=$BUILDKITE_COMMIT --build-arg USE_SCCACHE=1 --build-arg CUDA_VERSION=11.8.0 --tag {{ docker_image_cu118 }} --target test --progress plain ."
+      - "docker push {{ docker_image_cu118 }}"
     env:
       DOCKER_BUILDKIT: "1"
     retry:

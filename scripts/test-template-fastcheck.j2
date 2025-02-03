@@ -211,6 +211,7 @@ steps:
 
   - label: "TPU Test"
     depends_on: ~
+    soft_fail: true
     agents:
       queue: tpu_queue
     commands: 

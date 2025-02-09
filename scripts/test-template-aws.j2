@@ -242,8 +242,11 @@ steps:
   - group: "AMD Tests"
     depends_on: ~
     steps:
-      - label: "AMD: :docker: build image"
+      - block: "Build AMD image"
+        key: block-amd-build
         depends_on: ~
+      - label: "AMD: :docker: build image"
+        depends_on: block-amd-build
         commands:
           # Handle the introduction of test target in Dockerfile.rocm
           - "grep -i 'from base as test' Dockerfile.rocm && docker build --build-arg max_jobs=16 --tag {{ docker_image_amd }} -f Dockerfile.rocm --target test --progress plain . || docker build --build-arg max_jobs=16 --tag {{ docker_image_amd }} -f Dockerfile.rocm --progress plain ."

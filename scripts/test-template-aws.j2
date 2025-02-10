@@ -15,6 +15,7 @@ steps:
   - label: ":docker: build image"
     depends_on: block-build-image
     key: image-build
+    timeout_in_minutes: 360
     agents:
       queue: cpu_queue_postmerge
     commands:

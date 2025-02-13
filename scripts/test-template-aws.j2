@@ -242,11 +242,8 @@ steps:
   - group: "AMD Tests"
     depends_on: ~
     steps:
-      - block: "Build AMD image"
-        key: block-amd-build
-        depends_on: ~
       - label: "AMD: :docker: build image"
-        depends_on: block-amd-build
+        depends_on: ~
         commands:
           # Handle the introduction of test target in Dockerfile.rocm
           - "grep -i 'from base as test' Dockerfile.rocm && docker build --build-arg max_jobs=16 --tag {{ docker_image_amd }} -f Dockerfile.rocm --target test --progress plain . || docker build --build-arg max_jobs=16 --tag {{ docker_image_amd }} -f Dockerfile.rocm --progress plain ."
@@ -267,11 +264,8 @@ steps:
 
     {% for step in steps %}
     {% if step.mirror_hardwares and "amd" in step.mirror_hardwares %}
-      - block: "Run AMD test {{ step.label }}"
-        depends_on: "amd-build"
-        key: block-amd-{{ step.label | replace(" ", "-") | lower | replace("(", "") | replace(")", "") | replace("%", "") | replace(",", "-") }}
       - label: "AMD: {{ step.label }}"
-        depends_on: block-amd-{{ step.label | replace(" ", "-") | lower | replace("(", "") | replace(")", "") | replace("%", "") | replace(",", "-") }}
+        depends_on: amd-build
         agents:
           queue: amd_gpu
         command: bash .buildkite/run-amd-test.sh "(command rocm-smi || true) && export VLLM_LOGGING_LEVEL=DEBUG && export VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1 && cd {{ (step.working_dir or default_working_dir) | safe  }} ; {{ step.command  or (step.commands | join(" && ")) | safe }}"

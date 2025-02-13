@@ -66,14 +66,30 @@ patterns=(
     "setup.py"
     "csrc/"
 )
+
+ignore_patterns=(
+    "Dockerfile.rocm"
+    "Dockerfile.rocm_base"
+)
+
 for file in $file_diff; do
-    for pattern in "${patterns[@]}"; do
-        if [[ $file == $pattern* ]] || [[ $file == $pattern ]]; then
-            RUN_ALL=1
-            echo "Found changes: $file. Run all tests"
+    ignore_file=0
+    for ignore in "${ignore_patterns[@]}"; do
+        if [[ $file == $ignore* ]] || [[ $file == $ignore ]]; then
+            ignore_file=1
             break
         fi
     done
+
+    if [[ $ignore_file -eq 0 ]]; then
+        for pattern in "${patterns[@]}"; do
+            if [[ $file == $pattern* ]] || [[ $file == $pattern ]]; then
+                RUN_ALL=1
+                echo "Found changes: $file. Run all tests"
+                break
+            fi
+        done
+    fi
 done
 
 LIST_FILE_DIFF=$(get_diff | tr ' ' '|')

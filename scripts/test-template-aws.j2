@@ -330,7 +330,7 @@ steps:
       queue: ibm-ppc64le
     command: bash .buildkite/run-cpu-test-ppc64le.sh
 
-  {% if branch == "main" %}
+  {% if nightly == "1" %}
   - label: "GH200 Test"
     depends_on: ~
     soft_fail: true

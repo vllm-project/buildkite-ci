@@ -267,11 +267,11 @@ steps:
       - label: "AMD: {{ step.label }}"
         depends_on: amd-build
         agents:
-        {% if step.amd_gpu_type and step.amd_gpu_type=="mi300"%}
-          queue: amd_mi300
-        {% else%}
-          queue: amd_gpu
-        {% endif%}
+         {% if step.amd_gpu_type and step.amd_gpu_type=="mi300"%}
+           queue: amd_mi300
+         {% else%}
+           queue: amd_gpu
+         {% endif%}
 
 
         command: bash .buildkite/run-amd-test.sh "(command rocm-smi || true) && export VLLM_LOGGING_LEVEL=DEBUG && export VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1 && cd {{ (step.working_dir or default_working_dir) | safe  }} ; {{ step.command  or (step.commands | join(" && ")) | safe }}"

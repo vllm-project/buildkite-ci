@@ -267,8 +267,7 @@ steps:
       - label: "AMD: {{ step.label }}"
         depends_on: amd-build
         agents:
-          queue: amd_gpu
-    {% if step.amd_gpus and step.amd_gpus=="mi300"%}
+    {% if step.amd_gpu_type and step.amd_gpu_type=="mi300"%}
           queue: amd_mi300
     {% else%}
           queue: amd_gpu

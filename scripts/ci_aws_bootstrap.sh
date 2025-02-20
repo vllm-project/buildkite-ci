@@ -70,6 +70,13 @@ patterns=(
 ignore_patterns=(
     "Dockerfile.rocm"
     "Dockerfile.rocm_base"
+    "requirements-rocm"
+    "requirements-hpu"
+    "requirements-openvino"
+    "requirements-neuron"
+    "requirements-tpu"
+    "requirements-xpu"
+    "requirements-cpu"
 )
 
 for file in $file_diff; do

@@ -146,7 +146,9 @@ steps:
     depends_on: image-build
     {% endif %}
     agents:
-      {% if step.label == "Documentation Build" %}
+      {% if step.label == "Async Engine, Inputs, Utils, Worker Test" or step.label == "Core" or step.label == "Distributed Tests (4 GPUs)" or step.label == "Metrics, Tracing Test" or step.label == "Regression Test" or step.label == "Examples Test" or step.label == "Prefix Caching Test" or step.label == "V1 Test" or step.label == "LogitsProcessor Test" or step.label == "PyTorch Fullgraph Smoke Test" or step.label == "PyTorch Fullgraph Test" or step.label == "LM Eval Small Models" or step.label == "Encoder Decoder tests" or step.label == "OpenAI-Compatible Tool Use" %}
+      queue: moc-a100
+      {% elif step.label == "Documentation Build" %}
       queue: small_cpu_queue_premerge
       {% elif step.no_gpu %}
       queue: cpu_queue_premerge

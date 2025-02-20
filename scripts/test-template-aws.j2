@@ -246,7 +246,7 @@ steps:
     steps:
       - label: "AMD: :docker: build image"
         depends_on: ~
-        priority: 100
+        priority: 1000
         commands:
           # Handle the introduction of test target in Dockerfile.rocm
           - "grep -i 'from base as test' Dockerfile.rocm && docker build --build-arg max_jobs=16 --tag {{ docker_image_amd }} -f Dockerfile.rocm --target test --progress plain . || docker build --build-arg max_jobs=16 --tag {{ docker_image_amd }} -f Dockerfile.rocm --progress plain ."
@@ -268,7 +268,7 @@ steps:
     {% for step in steps %}
     {% if step.mirror_hardwares and "amd" in step.mirror_hardwares %}
       - label: "AMD: {{ step.label }}"
-        priority: 100
+        priority: 1000
         depends_on: amd-build
         agents:
          {% if step.amd_gpu_type and step.amd_gpu_type=="mi300"%}

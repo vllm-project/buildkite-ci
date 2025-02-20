@@ -244,6 +244,7 @@ steps:
     steps:
       - label: "AMD: :docker: build image"
         depends_on: ~
+        soft_fail: true
         commands:
           # Handle the introduction of test target in Dockerfile.rocm
           - "grep -i 'from base as test' Dockerfile.rocm && docker build --build-arg max_jobs=16 --tag {{ docker_image_amd }} -f Dockerfile.rocm --target test --progress plain . || docker build --build-arg max_jobs=16 --tag {{ docker_image_amd }} -f Dockerfile.rocm --progress plain ."

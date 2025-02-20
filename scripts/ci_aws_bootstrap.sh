@@ -80,22 +80,30 @@ ignore_patterns=(
 )
 
 for file in $file_diff; do
-    ignore_file=0
-    for ignore in "${ignore_patterns[@]}"; do
-        if [[ $file == $ignore* ]] || [[ $file == $ignore ]]; then
-            ignore_file=1
+    # First check if file matches any pattern
+    matches_pattern=0
+    for pattern in "${patterns[@]}"; do
+        if [[ $file == $pattern* ]] || [[ $file == $pattern ]]; then
+            matches_pattern=1
             break
         fi
     done
 
-    if [[ $ignore_file -eq 0 ]]; then
-        for pattern in "${patterns[@]}"; do
-            if [[ $file == $pattern* ]] || [[ $file == $pattern ]]; then
-                RUN_ALL=1
-                echo "Found changes: $file. Run all tests"
+    # If file matches pattern, check it's not in ignore patterns
+    if [[ $matches_pattern -eq 1 ]]; then
+        matches_ignore=0
+        for ignore in "${ignore_patterns[@]}"; do
+            if [[ $file == $ignore* ]] || [[ $file == $ignore ]]; then
+                matches_ignore=1
                 break
             fi
         done
+
+        if [[ $matches_ignore -eq 0 ]]; then
+            RUN_ALL=1
+            echo "Found changes: $file. Run all tests"
+            break
+        fi
     fi
 done
 

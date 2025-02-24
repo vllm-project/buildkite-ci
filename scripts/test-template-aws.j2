@@ -175,7 +175,7 @@ steps:
           limit: 1
     {% if step.num_nodes < 2 %}
     plugins:
-      {% if step.gpu != "a100" %}
+      {% if step.gpu != "a100" and step.label != "Async Engine, Inputs, Utils, Worker Test" and step.label != "Core" and step.label != "Distributed Tests (4 GPUs)" and step.label != "Metrics, Tracing Test" and step.label != "Regression Test" and step.label != "Examples Test" and step.label != "Prefix Caching Test" and step.label != "V1 Test" and step.label != "LogitsProcessor Test" and step.label != "PyTorch Fullgraph Smoke Test" and step.label != "PyTorch Fullgraph Test" and step.label != "LM Eval Small Models" and step.label != "Encoder Decoder tests" and step.label != "OpenAI-Compatible Tool Use" %}
       - docker#v5.2.0: {# for GPU test #}
           image: {{ docker_image }}
           always-pull: true

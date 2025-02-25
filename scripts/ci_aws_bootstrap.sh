@@ -25,7 +25,7 @@ upload_pipeline() {
         exit 0
     fi
     if [ ! -e ".buildkite/test-template.j2" ]; then
-        curl -o .buildkite/test-template.j2 https://raw.githubusercontent.com/vllm-project/buildkite-ci/main/scripts/test-template-aws.j2?$(date +%s)
+        curl -o .buildkite/test-template.j2 https://raw.githubusercontent.com/vllm-project/buildkite-ci/amd/mi300_slice_enablement/scripts/test-template-aws.j2?$(date +%s)
     fi
     if [ -e ".buildkite/pipeline_generator/pipeline_generator.py" ]; then
         python -m pip install click pydantic

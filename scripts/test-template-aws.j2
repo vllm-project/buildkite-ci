@@ -269,6 +269,7 @@ steps:
         depends_on: amd-build
         agents:
          {% if step.amd_gpu_type and step.amd_gpu_type=="mi300"%}
+         #{% if step.label and step.amd_gpu_type=="Benchmarks"%}
            queue: amd_mi300
          {% else%}
            queue: amd_gpu

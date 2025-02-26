@@ -24,9 +24,9 @@ data "google_tpu_v2_runtime_versions" "available" {
 
 resource "google_compute_disk" "disk" {
   provider = google-beta
-  count = 8
+  count = 7
 
-  name  = "tpu-disk-${count.index}"
+  name  = "tpu-disk-${count.index + 1}"
   size  = 512
   type  = "pd-ssd"
   zone  = "us-south1-a"
@@ -34,8 +34,8 @@ resource "google_compute_disk" "disk" {
 
 resource "google_tpu_v2_vm" "tpu" {
   provider = google-beta
-  count = 8
-  name = "vllm-tpu-${count.index}"
+  count = 7
+  name = "vllm-tpu-${count.index + 1}"
   zone = "us-south1-a"
 
   runtime_version = "v2-alpha-tpuv5-lite"
@@ -76,7 +76,7 @@ resource "google_tpu_v2_vm" "tpu" {
 
       sudo sed -i "s/xxx/${var.buildkite_agent_token}/g" /etc/buildkite-agent/buildkite-agent.cfg
       sudo sed -i 's/name="%hostname-%spawn"/name="vllm-tpu-${count.index}"/' /etc/buildkite-agent/buildkite-agent.cfg
-      echo 'tags="queue=tpu"' | sudo tee -a /etc/buildkite-agent/buildkite-agent.cfg
+      echo 'tags="queue=tpu_queue"' | sudo tee -a /etc/buildkite-agent/buildkite-agent.cfg
       echo 'HF_TOKEN=${var.huggingface_token}' | sudo tee -a /etc/environment
 
       sudo mkfs.ext4 -m 0 -E lazy_itable_init=0,lazy_journal_init=0,discard /dev/sdb

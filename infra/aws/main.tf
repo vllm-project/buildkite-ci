@@ -63,8 +63,7 @@ locals {
     RootVolumeSize                      = 512   # Gb
     EnableDockerUserNamespaceRemap      = false # Turn off remap so we can run dind
     BuildkiteAgentTimestampLines        = true
-    BuildkiteTerminateInstanceAfterJob  = false
-    ScaleInIdlePeriod                   = 300
+    BuildkiteTerminateInstanceAfterJob  = true
   }
 
   queues_parameters_premerge = {
@@ -151,46 +150,6 @@ locals {
       InstanceOperatingSystem              = "linux"
       OnDemandPercentage                   = 100
       EnableInstanceStorage                = "true"
-    }
-
-    small-cpu-queue = {
-      BuildkiteQueue                       = "small_cpu_queue"
-      InstanceTypes                        = "r6in.large" # Intel Ice Lake with AVX-512 for vLLM CPU backend
-      MaxSize                              = 10
-      ECRAccessPolicy                      = "poweruser"
-      InstanceOperatingSystem              = "linux"
-      OnDemandPercentage                   = 100
-      EnableInstanceStorage                = "true"
-    }
-
-    cpu-queue = {
-      BuildkiteQueue                       = "cpu_queue"
-      InstanceTypes                        = "r6in.16xlarge" # 512GB memory for CUDA kernel compilation
-      MaxSize                              = 10
-      ECRAccessPolicy                      = "poweruser"
-      InstanceOperatingSystem              = "linux"
-      OnDemandPercentage                   = 100
-      EnableInstanceStorage                = "true"
-    }
-
-    gpu-1-queue = {
-      BuildkiteQueue                       = "gpu_1_queue"
-      InstanceTypes                        = "g6.4xlarge"  # 1 Nvidia L4 GPU, 64GB memory
-      MaxSize                              = 64
-      ECRAccessPolicy                      = "readonly"
-      InstanceOperatingSystem              = "linux"
-      OnDemandPercentage                   = 100
-      ImageId                              = "ami-03d9992ee575904da" # Custom AMI with CUDA 12.0
-    }
-
-    gpu-4-queue = {
-      BuildkiteQueue                       = "gpu_4_queue"
-      InstanceTypes                        = "g6.12xlarge" # 4 Nvidia L4 GPUs, 192GB memory
-      MaxSize                              = 12
-      ECRAccessPolicy                      = "readonly"
-      InstanceOperatingSystem              = "linux"
-      OnDemandPercentage                   = 100
-      ImageId                              = "ami-03d9992ee575904da" # Custom AMI with CUDA 12.0
     }
   }
 
@@ -469,7 +428,10 @@ resource "aws_iam_policy" "bk_stack_secrets_access" {
     Statement = [{
       Action = ["secretsmanager:GetSecretValue"],
       Effect = "Allow",
-      Resource = [aws_secretsmanager_secret.ci_hf_token.arn]
+      Resource = [
+        aws_secretsmanager_secret.ci_hf_token.arn,
+        aws_secretsmanager_secret.bk_analytics_token.arn
+      ]
     }]
   })
 }

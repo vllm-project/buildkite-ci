@@ -178,7 +178,7 @@ steps:
           {% if step.label == "Benchmarks" %}
           mount-buildkite-agent: true
           {% endif %}
-          command: ["bash", "-xc", "(command nvidia-smi || true) && {% if step.label != "Speculative decoding tests" %}export VLLM_CI_USE_S3=1 && {% endif %}export VLLM_LOGGING_LEVEL=DEBUG && export VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1 && cd {{ (step.working_dir or default_working_dir) | safe  }} && {{ step.command  or (step.commands | join(' && ')) | safe }}"]
+          command: ["bash", "-xc", "(command nvidia-smi || true) && export VLLM_LOGGING_LEVEL=DEBUG && export VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1 && cd {{ (step.working_dir or default_working_dir) | safe  }} && {{ step.command  or (step.commands | join(' && ')) | safe }}"]
           environment:
             - VLLM_USAGE_SOURCE=ci-test
             - HF_HOME={{ hf_home_docker }}
@@ -199,7 +199,7 @@ steps:
             containers:
             - image: {{ docker_image }}
               command:
-                - bash -c '(command nvidia-smi || true) && export VLLM_LOGGING_LEVEL=DEBUG && export VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1 {% if step.label in ["Basic Correctness Test", "Basic Models Test", "Entrypoints Test", "Metrics, Tracing Test", "Async Engine, Inputs, Utils, Worker Test", "Samplers Test", "Engine Test"] %}&&  export VLLM_CI_USE_S3=1{% endif %} && cd {{ (step.working_dir or default_working_dir) | safe }} && {{ step.command or (step.commands | join(' && ')) | safe }}'
+                - bash -c '(command nvidia-smi || true) && export VLLM_LOGGING_LEVEL=DEBUG && export VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1 && cd {{ (step.working_dir or default_working_dir) | safe }} && {{ step.command or (step.commands | join(' && ')) | safe }}'
               resources:
                 limits:
                   nvidia.com/gpu: {{ step.num_gpus or 1 }}

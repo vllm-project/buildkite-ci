@@ -265,7 +265,7 @@ steps:
           queue: amd-cpu
 
     {% for step in steps %}
-    {% if step.mirror_hardwares and "amd" in step.mirror_hardwares %}
+    {% if step.mirror_hardwares and "amd" in step.mirror_hardwares and step.label == "Entrypoints Test" %}
       - label: "AMD: {{ step.label }}"
         depends_on: amd-build
         agents:
@@ -280,7 +280,25 @@ steps:
           DOCKER_BUILDKIT: "1"
         priority: 100
         soft_fail: true
-        
+    {% else %}
+      - block: "Run AMD: {{ step.label }}"
+        depends_on: amd-build
+        key: block-amd-{{ step.label | replace(" ", "-") | lower | replace("(", "") | replace(")", "") | replace("%", "") | replace(",", "-") }}
+  
+      - label: "AMD: {{ step.label }}"
+        depends_on: block-amd-{{ step.label | replace(" ", "-") | lower | replace("(", "") | replace(")", "") | replace("%", "") | replace(",", "-") }}
+        agents:
+         {% if step.label and step.label=="Benchmarks"%}
+           queue: amd_mi300
+         {% else%}
+           queue: amd_gpu
+         {% endif%}
+         
+        command: bash .buildkite/run-amd-test.sh "(command rocm-smi || true) && export VLLM_LOGGING_LEVEL=DEBUG && export VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1 && cd {{ (step.working_dir or default_working_dir) | safe  }} ; {{ step.command  or (step.commands | join(" && ")) | safe }}"
+        env:
+          DOCKER_BUILDKIT: "1"
+        priority: 100
+        soft_fail: true
     {% endif %}
     {% endfor %}
     

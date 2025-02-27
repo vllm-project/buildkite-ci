@@ -265,7 +265,8 @@ steps:
           queue: amd-cpu
 
     {% for step in steps %}
-    {% if step.mirror_hardwares and "amd" in step.mirror_hardwares and step.label == "Entrypoints Test" %}
+    {% if step.mirror_hardwares and "amd" in step.mirror_hardwares %}
+    {% if step.label == "Entrypoints Test" %}
       - label: "AMD: {{ step.label }}"
         depends_on: amd-build
         agents:
@@ -299,6 +300,7 @@ steps:
           DOCKER_BUILDKIT: "1"
         priority: 100
         soft_fail: true
+    {% endif %}
     {% endif %}
     {% endfor %}
     

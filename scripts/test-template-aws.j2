@@ -266,7 +266,7 @@ steps:
 
     {% for step in steps %}
     {% if step.mirror_hardwares and "amd" in step.mirror_hardwares %}
-    {% if step.label == "Entrypoints Test" %}
+    {% if step.label == "Entrypoints Test" % or step.label=="Benchmarks"}
       - label: "AMD: {{ step.label }}"
         depends_on: amd-build
         agents:

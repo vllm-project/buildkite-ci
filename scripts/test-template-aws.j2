@@ -266,11 +266,11 @@ steps:
 
     {% for step in steps %}
     {% if step.mirror_hardwares and "amd" in step.mirror_hardwares %}
-    {% if step.label == "Entrypoints Test" or step.label=="LoRA Test" %}
+    {% if step.label == "Entrypoints Test" or step.label=="Benchmarks" or step.label=="LoRA Test" or step.label=="Kernels Test" %}
       - label: "AMD: {{ step.label }}"
         depends_on: amd-build
         agents:
-         {% if step.label and step.label=="Benchmarks" %}
+         {% if step.label and step.label=="Benchmarks" or step.label=="LoRA Test" or step.label=="Kernels Test" %}
            queue: amd_mi300
          {% else%}
            queue: amd_gpu

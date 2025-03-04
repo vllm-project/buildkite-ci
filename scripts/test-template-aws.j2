@@ -8,6 +8,7 @@
 {% set default_working_dir = "/vllm-workspace/tests" %}
 {% set hf_home = "/root/.cache/huggingface" %}
 {% set hf_home_efs = "/mnt/efs/hf_cache" %}
+{% set hf_home_fsx = "/fsx/hf_cache" %}
 {% set list_file_diff = list_file_diff | split("|") %}
 
 steps:
@@ -188,7 +189,7 @@ steps:
           command: ["bash", "-xc", "(command nvidia-smi || true) && export VLLM_LOGGING_LEVEL=DEBUG && export VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1 && cd {{ (step.working_dir or default_working_dir) | safe  }} && {{ step.command  or (step.commands | join(' && ')) | safe }}"]
           environment:
             - VLLM_USAGE_SOURCE=ci-test
-            - HF_HOME={{ hf_home_efs }}
+            - HF_HOME={{ hf_home_fsx }}
             - HF_TOKEN
             {% if branch == "main" %}
             - BUILDKITE_ANALYTICS_TOKEN
@@ -198,7 +199,7 @@ steps:
             {% endif %}
           volumes:
             - /dev/shm:/dev/shm
-            - {{ hf_home_efs }}:{{ hf_home_efs }}
+            - {{ hf_home_fsx }}:{{ hf_home_fsx }}
       {% else %} {# A100 is managed on EKS #}
       - kubernetes:
           podSpec:

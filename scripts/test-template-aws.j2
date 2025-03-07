@@ -363,5 +363,5 @@ steps:
     agents:
       queue: tpu_queue
     commands: 
-    - if [[ -f ".buildkite/run-tpu-test.sh" ]]; then bash .buildkite/run-tpu-test.sh; fi 
     - yes | docker system prune -a
+    - if [[ -f ".buildkite/run-tpu-test.sh" ]]; then bash .buildkite/run-tpu-test.sh; fi

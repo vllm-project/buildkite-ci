@@ -244,8 +244,12 @@ steps:
   - group: "AMD Tests"
     depends_on: ~
     steps:
-      - label: "AMD: :docker: build image"
+      - block: "Block AMD build"
         depends_on: ~
+        key: block-amd-build
+      
+      - label: "AMD: :docker: build image"
+        depends_on: block-amd-build
         soft_fail: true
         commands:
           # Handle the introduction of test target in Dockerfile.rocm
@@ -267,7 +271,7 @@ steps:
 
     {% for step in steps %}
     {% if step.mirror_hardwares and "amd" in step.mirror_hardwares %}
-    {% if step.label == "Entrypoints Test" or step.label=="Benchmarks" %}
+    {% if step.label == "placeholder" %}
       - label: "AMD: {{ step.label }}"
         depends_on: amd-build
         agents:

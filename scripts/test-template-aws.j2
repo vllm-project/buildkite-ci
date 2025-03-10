@@ -361,6 +361,7 @@ steps:
     command: nvidia-smi && bash .buildkite/run-gh200-test.sh
   {% endif %}
 
+  {% if branch == "main" %}
   - label: "TPU Test"
     depends_on: ~
     soft_fail: True
@@ -369,3 +370,16 @@ steps:
     commands: 
     - yes | docker system prune -a
     - if [[ -f ".buildkite/run-tpu-test.sh" ]]; then bash .buildkite/run-tpu-test.sh; fi
+  {% else %}
+  - label: "Run TPU Test"
+    depends_on: ~
+    key: block-tpu-test
+  
+  - label: "TPU Test"
+    depends_on: block-tpu-test
+    agents:
+      queue: tpu_queue
+    commands: 
+    - yes | docker system prune -a
+    - if [[ -f ".buildkite/run-tpu-test.sh" ]]; then bash .buildkite/run-tpu-test.sh; fi
+  {% endif %}

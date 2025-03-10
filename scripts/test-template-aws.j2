@@ -371,7 +371,7 @@ steps:
     - yes | docker system prune -a
     - if [[ -f ".buildkite/run-tpu-test.sh" ]]; then bash .buildkite/run-tpu-test.sh; fi
   {% else %}
-  - label: "Run TPU Test"
+  - block: "Run TPU Test"
     depends_on: ~
     key: block-tpu-test
   

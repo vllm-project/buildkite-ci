@@ -239,51 +239,51 @@ steps:
       queue: gh200_queue
     command: nvidia-smi && bash .buildkite/run-gh200-test.sh
 
-    - group: "AMD Tests"
-      depends_on: ~
-      steps:
-        - block: "Block AMD build"
-          depends_on: ~
-          key: block-amd-build
+  - group: "AMD Tests"
+    depends_on: ~
+    steps:
+      - block: "Block AMD build"
+        depends_on: ~
+        key: block-amd-build
+
+      - label: "AMD: :docker: build image"
+        depends_on: block-amd-build
+        soft_fail: true
+        commands:
+          - "grep -i 'from base as test' Dockerfile.rocm && docker build --build-arg max_jobs=16 --tag {{ docker_image_amd }} -f Dockerfile.rocm --target test --progress plain . || docker build --build-arg max_jobs=16 --tag {{ docker_image_amd }} -f Dockerfile.rocm --progress plain ."
+          - "docker push {{ docker_image_amd }}"
+        key: amd-build
+        env:
+          DOCKER_BUILDKIT: "1"
+        retry:
+          automatic:
+            - exit_status: -1  # Agent was lost
+              limit: 1
+            - exit_status: -10  # Agent was lost
+              limit: 1
+            - exit_status: 1  # Machine occasionally fail
+              limit: 1
+        agents:
+          queue: amd-cpu
+    {% for step in steps %}
+    {% if step.mirror_hardwares and "amd" in step.mirror_hardwares %}
+      - block: "Run AMD: {{ step.label }}"
+        depends_on: amd-build
+        key: block-amd-{{ step.label | replace(" ", "-") | lower | replace("(", "") | replace(")", "") | replace("%", "") | replace(",", "-") }}
   
-        - label: "AMD: :docker: build image"
-          depends_on: block-amd-build
-          soft_fail: true
-          commands:
-            - "grep -i 'from base as test' Dockerfile.rocm && docker build --build-arg max_jobs=16 --tag {{ docker_image_amd }} -f Dockerfile.rocm --target test --progress plain . || docker build --build-arg max_jobs=16 --tag {{ docker_image_amd }} -f Dockerfile.rocm --progress plain ."
-            - "docker push {{ docker_image_amd }}"
-          key: amd-build
-          env:
-            DOCKER_BUILDKIT: "1"
-          retry:
-            automatic:
-              - exit_status: -1  # Agent was lost
-                limit: 1
-              - exit_status: -10  # Agent was lost
-                limit: 1
-              - exit_status: 1  # Machine occasionally fail
-                limit: 1
-          agents:
-            queue: amd-cpu
-      {% for step in steps %}
-      {% if step.mirror_hardwares and "amd" in step.mirror_hardwares %}
-        - block: "Run AMD: {{ step.label }}"
-          depends_on: amd-build
-          key: block-amd-{{ step.label | replace(" ", "-") | lower | replace("(", "") | replace(")", "") | replace("%", "") | replace(",", "-") }}
-    
-        - label: "AMD: {{ step.label }}"
-          depends_on: block-amd-{{ step.label | replace(" ", "-") | lower | replace("(", "") | replace(")", "") | replace("%", "") | replace(",", "-") }}
-          agents:
-           {% if step.label and step.label=="Benchmarks"%}
-             queue: amd_mi300
-           {% else%}
-             queue: amd_gpu
-           {% endif%}
-           
-          command: bash .buildkite/run-amd-test.sh "(command rocm-smi || true) && export VLLM_LOGGING_LEVEL=DEBUG && export VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1 && cd {{ (step.working_dir or default_working_dir) | safe  }} ; {{ step.command  or (step.commands | join(" && ")) | safe }}"
-          env:
-            DOCKER_BUILDKIT: "1"
-          priority: 100
-          soft_fail: true
-      {% endif %}
-      {% endfor %}
+      - label: "AMD: {{ step.label }}"
+        depends_on: block-amd-{{ step.label | replace(" ", "-") | lower | replace("(", "") | replace(")", "") | replace("%", "") | replace(",", "-") }}
+        agents:
+         {% if step.label and step.label=="Benchmarks"%}
+           queue: amd_mi300
+         {% else%}
+           queue: amd_gpu
+         {% endif%}
+         
+        command: bash .buildkite/run-amd-test.sh "(command rocm-smi || true) && export VLLM_LOGGING_LEVEL=DEBUG && export VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1 && cd {{ (step.working_dir or default_working_dir) | safe  }} ; {{ step.command  or (step.commands | join(" && ")) | safe }}"
+        env:
+          DOCKER_BUILDKIT: "1"
+        priority: 100
+        soft_fail: true
+    {% endif %}
+    {% endfor %}

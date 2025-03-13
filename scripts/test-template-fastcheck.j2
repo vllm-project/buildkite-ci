@@ -38,7 +38,7 @@ steps:
   - label: "Neuron Test"
     depends_on: run-neuron-test
     agents:
-      queue: neuron
+      queue: neuron-dev
     command: bash .buildkite/run-neuron-test.sh
     soft_fail: false
 

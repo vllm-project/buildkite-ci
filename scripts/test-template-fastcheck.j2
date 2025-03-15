@@ -219,13 +219,22 @@ steps:
   {% endif %}
   {% endfor %}
 
-  - label: "TPU Test"
+  - label: "TPU V0 Test"
     depends_on: ~
     soft_fail: true
     agents:
       queue: tpu_queue
     commands: 
       - if [[ -f ".buildkite/run-tpu-test.sh" ]]; then bash .buildkite/run-tpu-test.sh; fi 
+      - yes | docker system prune -a
+
+  - label: "TPU V1 Test"
+    depends_on: ~
+    soft_fail: true
+    agents:
+      queue: tpu_queue
+    commands:
+      - if [[ -f ".buildkite/run-tpu-v1-test.sh" ]]; then bash .buildkite/run-tpu-v1-test.sh; fi
       - yes | docker system prune -a
 
   - block: "Run GH200 Test"

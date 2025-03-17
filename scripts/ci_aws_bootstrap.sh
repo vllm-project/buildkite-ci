@@ -60,7 +60,7 @@ fi
 
 patterns=(
     ".buildkite/test-pipeline"
-    "dockerfiles/"
+    "docker/"
     "CMakeLists.txt"
     "requirements/"
     "setup.py"
@@ -68,8 +68,8 @@ patterns=(
 )
 
 ignore_patterns=(
-    "dockerfiles/Dockerfile.rocm"
-    "dockerfiles/Dockerfile.rocm_base"
+    "docker/Dockerfile.rocm"
+    "docker/Dockerfile.rocm_base"
     "requirements/rocm"
     "requirements/hpu"
     "requirements/openvino"

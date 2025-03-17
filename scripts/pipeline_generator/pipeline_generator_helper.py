@@ -61,7 +61,7 @@ fi
 """
     docker_build_command = (
         f"docker build "
-        f"--file dockerfiles/Dockerfile "
+        f"--file docker/Dockerfile "
         f"--build-arg max_jobs=64 "
         f"--build-arg buildkite_commit={buildkite_commit} "
         f"--build-arg USE_SCCACHE=1 "

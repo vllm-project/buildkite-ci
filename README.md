@@ -45,3 +45,7 @@ Components of the stack for each Agent Queue:
 1. Create a feature branch on this repo, say named `my-feature-branch`. If you can't create a feature branch, ping @khluu to add you into the repo.
 2. Once the branch is created, you can start making changes and commit to the branch. Also, please remember to change `main` to `my-feature-branch` here: https://github.com/vllm-project/buildkite-ci/blob/main/scripts/ci_aws_bootstrap.sh#L28
 3. After the changes are pushed to the branch, wait a few minutes, then create a new build on Buildkite with this environment variable `VLLM_CI_BRANCH=my-feature-branch` to test your changes against vLLM codebase.
+
+Please note that when creating a new build on Buildkite:
+- Please do it on your own feature branch/fork branch on vLLM, preferrably a branch that is up to date with `main`.
+- If it's a fork branch, `HEAD` cannot be used as commit when creating a build. You have to put in the hash of the latest commit on your branch. 

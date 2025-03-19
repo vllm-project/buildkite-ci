@@ -219,8 +219,12 @@ steps:
   {% endif %}
   {% endfor %}
 
-  - label: "TPU V0 Test"
+  - block: "Run TPU V0 Test"
+    key: block-tpu-v0
     depends_on: ~
+
+  - label: "TPU V0 Test"
+    depends_on: block-tpu-v0
     soft_fail: true
     agents:
       queue: tpu_queue
@@ -228,8 +232,12 @@ steps:
       - if [[ -f ".buildkite/run-tpu-test.sh" ]]; then bash .buildkite/run-tpu-test.sh; fi 
       - yes | docker system prune -a
 
-  - label: "TPU V1 Test"
+  - block: "Run TPU V1 Test"
+    key: block-tpu-v1
     depends_on: ~
+
+  - label: "TPU V1 Test"
+    depends_on: block-tpu-v1
     soft_fail: true
     agents:
       queue: tpu_queue

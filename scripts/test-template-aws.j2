@@ -333,14 +333,10 @@ steps:
     agents:
       queue: intel-hpu
     command: bash .buildkite/run-hpu-test.sh
-
-  - block: "Run Intel GPU test"
-    depends_on: ~
-    key: block-intel-gpu
   
   - label: "Intel GPU Test"
     soft_fail: true
-    depends_on: block-intel-gpu
+    depends_on: ~
     agents:
       queue: intel-gpu
     command: bash .buildkite/run-xpu-test.sh
@@ -361,8 +357,7 @@ steps:
     command: nvidia-smi && bash .buildkite/run-gh200-test.sh
   {% endif %}
 
-  {% if branch == "main" %}
-  - label: "TPU Test"
+  - label: "TPU V0 Test"
     depends_on: ~
     soft_fail: True
     agents:
@@ -370,16 +365,12 @@ steps:
     commands: 
     - yes | docker system prune -a
     - if [[ -f ".buildkite/run-tpu-test.sh" ]]; then bash .buildkite/run-tpu-test.sh; fi
-  {% else %}
-  - block: "Run TPU Test"
+
+  - label: "TPU V1 Test"
     depends_on: ~
-    key: block-tpu-test
-  
-  - label: "TPU Test"
-    depends_on: block-tpu-test
+    soft_fail: true
     agents:
       queue: tpu_queue
-    commands: 
-    - yes | docker system prune -a
-    - if [[ -f ".buildkite/run-tpu-test.sh" ]]; then bash .buildkite/run-tpu-test.sh; fi
-  {% endif %}
+    commands:
+      - if [[ -f ".buildkite/run-tpu-v1-test.sh" ]]; then bash .buildkite/run-tpu-v1-test.sh; fi
+      - yes | docker system prune -a

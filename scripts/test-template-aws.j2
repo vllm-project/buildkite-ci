@@ -277,7 +277,7 @@ steps:
         agents:
          {% if step.label and step.label=="Benchmarks" or step.label=="Kernels Test" or step.label=="LoRA Test" %}
            queue: amd_mi300
-         {% else if step.label and step.label=="Core Test" or step.label=="Entrypoints Test" or step.label=="Regression Test" or step.label=="Engine Test" or step.label=="Prefix Caching Test" or step.label=="LogitsProcessor Test" or step.label=="Tensorizer Test" or step.label=="OpenAI-Compatible Tool Use" %}
+         {% elif step.label and step.label=="Core Test" or step.label=="Entrypoints Test" or step.label=="Regression Test" or step.label=="Engine Test" or step.label=="Prefix Caching Test" or step.label=="LogitsProcessor Test" or step.label=="Tensorizer Test" or step.label=="OpenAI-Compatible Tool Use" %}
            queue: amd_mi300_1
          {% else %}
 	   queue: amd_gpu
@@ -298,7 +298,7 @@ steps:
         agents:
          {% if step.label and step.label=="Benchmarks" or step.label=="Kernels Test" or step.label=="LoRA Test" %}
            queue: amd_mi300
-         {% else if step.label and step.label=="Core Test" or step.label=="Entrypoints Test" or step.label=="Regression Test" or step.label=="Engine Test" or step.label=="Prefix Caching Test" or step.label=="LogitsProcessor Test" or step.label=="Tensorizer Test" or step.label=="OpenAI-Compatible Tool Use" %}
+         {% elif step.label and step.label=="Core Test" or step.label=="Entrypoints Test" or step.label=="Regression Test" or step.label=="Engine Test" or step.label=="Prefix Caching Test" or step.label=="LogitsProcessor Test" or step.label=="Tensorizer Test" or step.label=="OpenAI-Compatible Tool Use" %}
            queue: amd_mi300_1
          {% else %}
            queue: amd_gpu

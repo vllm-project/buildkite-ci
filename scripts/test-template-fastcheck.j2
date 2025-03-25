@@ -235,9 +235,6 @@ steps:
     commands: 
       - if [[ -f ".buildkite/run-tpu-test.sh" ]]; then bash .buildkite/run-tpu-test.sh; fi 
       - yes | docker system prune -a
-    notify:
-      - email: "vllm-cicd-notifications@google.com"
-        if: build.state == "started_failing" || build.state == "failing" || build.state == "failed"
 
   - block: "Run TPU V1 Test"
     key: block-tpu-v1
@@ -251,9 +248,6 @@ steps:
     commands:
       - if [[ -f ".buildkite/run-tpu-v1-test.sh" ]]; then bash .buildkite/run-tpu-v1-test.sh; fi
       - yes | docker system prune -a
-    notify:
-      - email: "vllm-cicd-notifications@google.com"
-        if: build.state == "started_failing" || build.state == "failing" || build.state == "failed"
 
   - block: "Run GH200 Test"
     depends_on: ~

@@ -6,6 +6,10 @@
 {% set hf_home_fsx = "/fsx/hf_cache" %}
 
 steps:
+  - notify:
+      email: "vllm-cicd-notifications@google.com"
+      if: (step.label == "TPU V0 Test" || step.label == ""TPU V1 Test") && (step.outcome == "soft_failed" || step.outcome == "hard_failed")
+
   - label: ":docker: build image"
     key: image-build
     agents:

@@ -6,6 +6,7 @@
 {% set hf_home_fsx = "/fsx/hf_cache" %}
 
 steps:
+
   - label: ":docker: build image"
     key: image-build
     agents:
@@ -224,19 +225,36 @@ steps:
     depends_on: ~
 
   - label: "TPU V0 Test"
+    key: run-tpu-v0-test
     depends_on: block-tpu-v0
     soft_fail: true
     agents:
       queue: tpu_queue
-    commands: 
-      - if [[ -f ".buildkite/run-tpu-test.sh" ]]; then bash .buildkite/run-tpu-test.sh; fi 
+    commands:
+      - if [[ -f ".buildkite/run-tpu-test.sh" ]]; then bash .buildkite/run-tpu-test.sh; fi
       - yes | docker system prune -a
+
+  - label: "TPU V0 Test Notification"
+    depends_on: run-tpu-v0-test
+    agents:
+      queue: tpu_queue
+    commands: |
+      if [ $$(buildkite-agent step get "outcome" --step "run-tpu-v0-test") != "passed" ]; then
+         cat <<- YAML | buildkite-agent pipeline upload
+         steps:
+           - label: "Notify owners about failing test"
+             command: echo "TPU V0 Test failed"
+             notify:
+               - email: "ricliu@google.com"
+      YAML
+      fi
 
   - block: "Run TPU V1 Test"
     key: block-tpu-v1
     depends_on: ~
 
   - label: "TPU V1 Test"
+    key: run-tpu-v1-test
     depends_on: block-tpu-v1
     soft_fail: true
     agents:
@@ -245,6 +263,20 @@ steps:
       - if [[ -f ".buildkite/run-tpu-v1-test.sh" ]]; then bash .buildkite/run-tpu-v1-test.sh; fi
       - yes | docker system prune -a
 
+  - label: "TPU V1 Test Notification"
+    depends_on: run-tpu-v1-test
+    agents:
+      queue: tpu_queue
+    commands: |
+      if [ $$(buildkite-agent step get "outcome" --step "run-tpu-v1-test") != "passed" ]; then
+         cat <<- YAML | buildkite-agent pipeline upload
+         steps:
+           - label: "Notify owners about failing test"
+             command: echo "TPU V1 Test failed"
+             notify:
+               - email: "ricliu@google.com"
+      YAML
+      fi
   - block: "Run GH200 Test"
     depends_on: ~
     key: block-gh200

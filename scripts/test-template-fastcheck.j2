@@ -243,6 +243,8 @@ steps:
          cat <<- YAML | buildkite-agent pipeline upload
          steps:
            - label: "Notify owners about failing test"
+             agents:
+               queue: tpu_queue
              command: echo "TPU V0 Test failed"
              notify:
                - slack:
@@ -274,6 +276,8 @@ steps:
          cat <<- YAML | buildkite-agent pipeline upload
          steps:
            - label: "Notify owners about failing test"
+             agents:
+               queue: tpu_queue
              command: echo "TPU V1 Test failed"
              notify:
                - slack:

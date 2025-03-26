@@ -245,7 +245,9 @@ steps:
            - label: "Notify owners about failing test"
              command: echo "TPU V0 Test failed"
              notify:
-               - email: "ricliu@google.com"
+               - slack:
+                   channels:
+                     - "#collab-google-ci"
       YAML
       fi
 
@@ -274,7 +276,9 @@ steps:
            - label: "Notify owners about failing test"
              command: echo "TPU V1 Test failed"
              notify:
-               - email: "ricliu@google.com"
+               - slack:
+                   channels:
+                     - "#collab-google-ci"
       YAML
       fi
   - block: "Run GH200 Test"

@@ -291,12 +291,13 @@ steps:
       - label: "AMD: {{ step.label }}"
         depends_on: block-amd-{{ step.label | replace(" ", "-") | lower | replace("(", "") | replace(")", "") | replace("%", "") | replace(",", "-") }}
         agents:
-         {% if step.label and step.label=="Benchmarks"%}
+         {% if step.label and step.label=="Benchmarks" or step.label=="LoRA Test %N" or step.label=="Kernels Test %N" %}
            queue: amd_mi300
-         {% else%}
+         {% elif step.label and step.label=="Core Test" or step.label=="Entrypoints Test" or step.label=="Regression Test" or step.label=="Engine Test" or step.label=="Prefix Caching Test" or step.label=="LogitsProcessor Test" or step.label=="Tensorizer Test" or step.label=="OpenAI-Compatible Tool Use" %}
+           queue: amd_mi300_1
+         {% else %}
            queue: amd_gpu
          {% endif%}
-         
         command: bash .buildkite/run-amd-test.sh "(command rocm-smi || true) && export VLLM_LOGGING_LEVEL=DEBUG && export VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1 && cd {{ (step.working_dir or default_working_dir) | safe  }} ; {{ step.command  or (step.commands | join(" && ")) | safe }}"
         env:
           DOCKER_BUILDKIT: "1"

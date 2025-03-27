@@ -25,7 +25,7 @@ upload_pipeline() {
         exit 0
     fi
     if [ ! -e ".buildkite/test-template.j2" ]; then
-        curl -o .buildkite/test-template.j2 https://raw.githubusercontent.com/vllm-project/buildkite-ci/main/scripts/test-template-aws.j2?$(date +%s)
+        curl -o .buildkite/test-template.j2 https://raw.githubusercontent.com/vllm-project/buildkite-ci/update-dockerfile-paths/scripts/test-template-aws.j2?$(date +%s)
     fi
     if [ -e ".buildkite/pipeline_generator/pipeline_generator.py" ]; then
         python -m pip install click pydantic
@@ -60,23 +60,18 @@ fi
 
 patterns=(
     ".buildkite/test-pipeline"
-    "Dockerfile"
+    "docker/Dockerfile"
     "CMakeLists.txt"
-    "requirements*"
+    "requirements/common.txt"
+    "requirements/cuda.txt"
+    "requirements/build.txt"
+    "requirements/test.txt"
     "setup.py"
     "csrc/"
 )
 
 ignore_patterns=(
-    "Dockerfile.rocm"
-    "Dockerfile.rocm_base"
-    "requirements-rocm"
-    "requirements-hpu"
-    "requirements-openvino"
-    "requirements-neuron"
-    "requirements-tpu"
-    "requirements-xpu"
-    "requirements-cpu"
+    "docker/Dockerfile."
 )
 
 for file in $file_diff; do

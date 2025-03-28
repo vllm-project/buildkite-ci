@@ -269,9 +269,9 @@ steps:
       - label: "AMD: {{ step.label }}"
         depends_on: amd-build
         agents:
-         {% if step.label and step.label=="Benchmarks" or step.label=="LoRA Test %N" %}
+         {% if step.label and step.label=="Benchmarks" or step.label=="LoRA Test %N" or step.label=="Kernels Test %N" %}
            queue: amd_mi300
-         {% elif step.label and step.label=="Core Test" or step.label=="Regression Test" or step.label=="Engine Test" or step.label=="Prefix Caching Test" or step.label=="LogitsProcessor Test" %}
+         {% elif step.label and step.label=="Core Test" or step.label=="Entrypoints Test" or step.label=="Regression Test" or step.label=="Engine Test" or step.label=="Prefix Caching Test" or step.label=="LogitsProcessor Test" or step.label=="Tensorizer Test" or step.label=="OpenAI-Compatible Tool Use" %}
            queue: amd_mi300_1
          {% else %}
 	   queue: amd_gpu

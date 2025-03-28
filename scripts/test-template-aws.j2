@@ -243,14 +243,9 @@ steps:
 
   - group: "AMD Tests"
     depends_on: ~
-    steps:
-      - block: "Block AMD build"
-        depends_on: ~
-        key: block-amd-build
-      
+    steps:       
       - label: "AMD: :docker: build image"
-        depends_on: block-amd-build
-        soft_fail: true
+        soft_fail: false
         commands:
           # Handle the introduction of test target in Dockerfile.rocm
           - "grep -i 'from base as test' Dockerfile.rocm && docker build --build-arg max_jobs=16 --tag {{ docker_image_amd }} -f Dockerfile.rocm --target test --progress plain . || docker build --build-arg max_jobs=16 --tag {{ docker_image_amd }} -f Dockerfile.rocm --progress plain ."
@@ -271,13 +266,12 @@ steps:
 
     {% for step in steps %}
     {% if step.mirror_hardwares and "amd" in step.mirror_hardwares %}
-    {% if step.label == "placeholder" %}
       - label: "AMD: {{ step.label }}"
         depends_on: amd-build
         agents:
-         {% if step.label and step.label=="Benchmarks" or step.label=="LoRA Test %N" or step.label=="Kernels Test %N" %}
+         {% if step.label and step.label=="Benchmarks" or step.label=="LoRA Test %N" %}
            queue: amd_mi300
-         {% elif step.label and step.label=="Core Test" or step.label=="Entrypoints Test" or step.label=="Regression Test" or step.label=="Engine Test" or step.label=="Prefix Caching Test" or step.label=="LogitsProcessor Test" or step.label=="Tensorizer Test" or step.label=="OpenAI-Compatible Tool Use" %}
+         {% elif step.label and step.label=="Core Test" or step.label=="Regression Test" or step.label=="Engine Test" or step.label=="Prefix Caching Test" or step.label=="LogitsProcessor Test" %}
            queue: amd_mi300_1
          {% else %}
 	   queue: amd_gpu
@@ -287,28 +281,7 @@ steps:
         env:
           DOCKER_BUILDKIT: "1"
         priority: 100
-        soft_fail: true
-    {% else %}
-      - block: "Run AMD: {{ step.label }}"
-        depends_on: amd-build
-        key: block-amd-{{ step.label | replace(" ", "-") | lower | replace("(", "") | replace(")", "") | replace("%", "") | replace(",", "-") }}
-  
-      - label: "AMD: {{ step.label }}"
-        depends_on: block-amd-{{ step.label | replace(" ", "-") | lower | replace("(", "") | replace(")", "") | replace("%", "") | replace(",", "-") }}
-        agents:
-         {% if step.label and step.label=="Benchmarks" or step.label=="LoRA Test %N" or step.label=="Kernels Test %N" %}
-           queue: amd_mi300
-         {% elif step.label and step.label=="Core Test" or step.label=="Entrypoints Test" or step.label=="Regression Test" or step.label=="Engine Test" or step.label=="Prefix Caching Test" or step.label=="LogitsProcessor Test" or step.label=="Tensorizer Test" or step.label=="OpenAI-Compatible Tool Use" %}
-           queue: amd_mi300_1
-         {% else %}
-           queue: amd_gpu
-         {% endif%} 
-        command: bash .buildkite/run-amd-test.sh "(command rocm-smi || true) && export VLLM_LOGGING_LEVEL=DEBUG && export VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1 && cd {{ (step.working_dir or default_working_dir) | safe  }} ; {{ step.command  or (step.commands | join(" && ")) | safe }}"
-        env:
-          DOCKER_BUILDKIT: "1"
-        priority: 100
-        soft_fail: true
-    {% endif %}
+        soft_fail: false
     {% endif %}
     {% endfor %}
     

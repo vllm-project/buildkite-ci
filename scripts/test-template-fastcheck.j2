@@ -280,7 +280,7 @@ steps:
     {% for step in steps %}
     {% if step.mirror_hardwares and "amd" in step.mirror_hardwares %}
       - label: "AMD: {{ step.label }}"
-        depends_on: block-amd-{{ step.label | replace(" ", "-") | lower | replace("(", "") | replace(")", "") | replace("%", "") | replace(",", "-") }}
+        depends_on: bmd-build
         agents:
          {% if step.label and step.label=="Benchmarks" or step.label=="LoRA Test %N" %}
            queue: amd_mi300

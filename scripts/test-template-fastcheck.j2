@@ -279,10 +279,6 @@ steps:
           queue: amd-cpu
     {% for step in steps %}
     {% if step.mirror_hardwares and "amd" in step.mirror_hardwares %}
-      - block: "Run AMD: {{ step.label }}"
-        depends_on: amd-build
-        key: block-amd-{{ step.label | replace(" ", "-") | lower | replace("(", "") | replace(")", "") | replace("%", "") | replace(",", "-") }}
-  
       - label: "AMD: {{ step.label }}"
         depends_on: block-amd-{{ step.label | replace(" ", "-") | lower | replace("(", "") | replace(")", "") | replace("%", "") | replace(",", "-") }}
         agents:

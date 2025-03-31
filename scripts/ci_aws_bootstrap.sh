@@ -60,23 +60,18 @@ fi
 
 patterns=(
     ".buildkite/test-pipeline"
-    "Dockerfile"
+    "docker/Dockerfile"
     "CMakeLists.txt"
-    "requirements*"
+    "requirements/common.txt"
+    "requirements/cuda.txt"
+    "requirements/build.txt"
+    "requirements/test.txt"
     "setup.py"
     "csrc/"
 )
 
 ignore_patterns=(
-    "Dockerfile.rocm"
-    "Dockerfile.rocm_base"
-    "requirements-rocm"
-    "requirements-hpu"
-    "requirements-openvino"
-    "requirements-neuron"
-    "requirements-tpu"
-    "requirements-xpu"
-    "requirements-cpu"
+    "docker/Dockerfile."
 )
 
 for file in $file_diff; do

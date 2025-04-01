@@ -1,4 +1,4 @@
-g% set docker_image = "public.ecr.aws/q9t5s3a7/vllm-ci-test-repo:$BUILDKITE_COMMIT" %}
+{% set docker_image = "public.ecr.aws/q9t5s3a7/vllm-ci-test-repo:$BUILDKITE_COMMIT" %}
 {% if branch == "main" %}
 {% set docker_image = "public.ecr.aws/q9t5s3a7/vllm-ci-postmerge-repo:$BUILDKITE_COMMIT" %}
 {% set docker_image_cu121 = "public.ecr.aws/q9t5s3a7/vllm-ci-postmerge-repo:$BUILDKITE_COMMIT-cu121" %}
@@ -253,7 +253,7 @@ steps:
         soft_fail: true
         commands:
           # Handle the introduction of test target in Dockerfile.rocm
-          - "grep -i 'from base as test' docker/Dockerfile.rocm && docker build --build-arg max_jobs=16 --tag {{ docker_image_amd }} -f docker/Dockerfile.rocm --target test --progress plain . || docker build --build-arg max_jobs=16 --tag {{ docker_image_amd }} -f docker/Dockerfile.rocm --progress plain ."
+         g- "grep -i 'from base as test' docker/Dockerfile.rocm && docker build --build-arg max_jobs=16 --tag {{ docker_image_amd }} -f docker/Dockerfile.rocm --target test --progress plain . || docker build --build-arg max_jobs=16 --tag {{ docker_image_amd }} -f docker/Dockerfile.rocm --progress plain ."
           - "docker push {{ docker_image_amd }}"
         key: "amd-build"
         env:

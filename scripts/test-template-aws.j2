@@ -222,8 +222,6 @@ steps:
                   secretKeyRef:
                     name: hf-token-secret
                     key: token
-            nodeSelector:
-              nvidia.com/gpu.product: NVIDIA-A100-SXM4-80GB
             volumes:
             - name: devshm
               emptyDir:

@@ -1,4 +1,4 @@
-{% set docker_image = "public.ecr.aws/q9t5s3a7/vllm-ci-test-repo:$BUILDKITE_COMMIT" %}
+g% set docker_image = "public.ecr.aws/q9t5s3a7/vllm-ci-test-repo:$BUILDKITE_COMMIT" %}
 {% set docker_image_amd = "rocm/vllm-ci:$BUILDKITE_COMMIT" %}
 {% set default_working_dir = "/vllm-workspace/tests" %}
 {% set hf_home = "/root/.cache/huggingface" %}
@@ -306,7 +306,7 @@ steps:
         depends_on: block-amd-build
         soft_fail: true
         commands:
-          - "grep -i 'from base as test' Dockerfile.rocm && docker build --build-arg max_jobs=16 --tag {{ docker_image_amd }} -f docker/Dockerfile.rocm --target test --progress plain . || docker build --build-arg max_jobs=16 --tag {{ docker_image_amd }} -f docker/Dockerfile.rocm --progress plain ."
+          - "grep -i 'from base as test' docker/Dockerfile.rocm && docker build --build-arg max_jobs=16 --tag {{ docker_image_amd }} -f docker/Dockerfile.rocm --target test --progress plain . || docker build --build-arg max_jobs=16 --tag {{ docker_image_amd }} -f docker/Dockerfile.rocm --progress plain ."
           - "docker push {{ docker_image_amd }}"
         key: amd-build
         env:

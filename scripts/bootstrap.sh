@@ -22,18 +22,14 @@ upload_pipeline() {
     source /var/lib/buildkite-agent/.cargo/env
 
     # If pipeline is fastcheck
-    if [ $BUILDKITE_PIPELINE_SLUG == "fastcheck" ]; then
-        if [ ! -e ".buildkite/test-template-fastcheck.j2" ]; then
-            curl -o .buildkite/test-template-fastcheck.j2 https://raw.githubusercontent.com/vllm-project/buildkite-ci/"$VLLM_CI_BRANCH"/scripts/test-template-fastcheck.j2
-        fi
-        cd .buildkite && minijinja-cli test-template-fastcheck.j2 test-pipeline.yaml > pipeline.yml
-        cat pipeline.yml
-        buildkite-agent pipeline upload pipeline.yml
-        exit 0
+    if [[ $BUILDKITE_PIPELINE_SLUG == "fastcheck" ]]; then
+        curl -o .buildkite/test-template.j2 https://raw.githubusercontent.com/vllm-project/buildkite-ci/"$VLLM_CI_BRANCH"/scripts/test-template-fastcheck.j2
     fi
 
     # If pipeline is CI
-    curl -o .buildkite/test-template-ci.j2 https://raw.githubusercontent.com/vllm-project/buildkite-ci/"$VLLM_CI_BRANCH"/scripts/test-template-ci.j2?$(date +%s)
+    if [[ $BUILDKITE_PIPELINE_SLUG == "ci" ]]; then
+        curl -o .buildkite/test-template.j2 https://raw.githubusercontent.com/vllm-project/buildkite-ci/"$VLLM_CI_BRANCH"/scripts/test-template-ci.j2?$(date +%s)
+    fi
 
     # (WIP) Use pipeline generator instead of jinja template
     if [ -e ".buildkite/pipeline_generator/pipeline_generator.py" ]; then
@@ -42,10 +38,11 @@ upload_pipeline() {
         buildkite-agent pipeline upload .buildkite/pipeline.yaml
         exit 0
     fi
-    cd .buildkite
     echo "List file diff: $LIST_FILE_DIFF"
     echo "Run all: $RUN_ALL"
     echo "Nightly: $NIGHTLY"
+
+    cd .buildkite
     minijinja-cli test-template.j2 test-pipeline.yaml -D branch="$BUILDKITE_BRANCH" -D list_file_diff="$LIST_FILE_DIFF" -D run_all="$RUN_ALL" -D nightly="$NIGHTLY" > pipeline.yml
     cat pipeline.yml
     buildkite-agent pipeline upload pipeline.yml

@@ -10,33 +10,39 @@ if [[ -z "${NIGHTLY:-}" ]]; then
     NIGHTLY=0
 fi
 
+if [[ -z "${VLLM_CI_BRANCH:-}" ]]; then
+    VLLM_CI_BRANCH="main"
+fi
+
 upload_pipeline() {
     echo "Uploading pipeline..."
+    # Install minijinja
     ls .buildkite || buildkite-agent annotate --style error 'Please merge upstream main branch for buildkite CI'
     curl -sSfL https://github.com/mitsuhiko/minijinja/releases/download/2.3.1/minijinja-cli-installer.sh | sh
     source /var/lib/buildkite-agent/.cargo/env
-    if [ $BUILDKITE_PIPELINE_SLUG == "fastcheck" ]; then
-        if [ ! -e ".buildkite/test-template-fastcheck.j2" ]; then
-            curl -o .buildkite/test-template-fastcheck.j2 https://raw.githubusercontent.com/vllm-project/buildkite-ci/main/scripts/test-template-fastcheck.j2
-        fi
-        cd .buildkite && minijinja-cli test-template-fastcheck.j2 test-pipeline.yaml > pipeline.yml
-        cat pipeline.yml
-        buildkite-agent pipeline upload pipeline.yml
-        exit 0
+
+    # If pipeline is fastcheck
+    if [[ $BUILDKITE_PIPELINE_SLUG == "fastcheck" ]]; then
+        curl -o .buildkite/test-template.j2 https://raw.githubusercontent.com/vllm-project/buildkite-ci/"$VLLM_CI_BRANCH"/scripts/test-template-fastcheck.j2
     fi
-    if [ ! -e ".buildkite/test-template.j2" ]; then
-        curl -o .buildkite/test-template.j2 https://raw.githubusercontent.com/vllm-project/buildkite-ci/main/scripts/test-template-aws.j2?$(date +%s)
+
+    # If pipeline is CI
+    if [[ $BUILDKITE_PIPELINE_SLUG == "ci" ]]; then
+        curl -o .buildkite/test-template.j2 https://raw.githubusercontent.com/vllm-project/buildkite-ci/"$VLLM_CI_BRANCH"/scripts/test-template-ci.j2?$(date +%s)
     fi
+
+    # (WIP) Use pipeline generator instead of jinja template
     if [ -e ".buildkite/pipeline_generator/pipeline_generator.py" ]; then
         python -m pip install click pydantic
         python .buildkite/pipeline_generator/pipeline_generator.py --run_all=$RUN_ALL --list_file_diff="$LIST_FILE_DIFF" --nightly="$NIGHTLY"
         buildkite-agent pipeline upload .buildkite/pipeline.yaml
         exit 0
     fi
-    cd .buildkite
     echo "List file diff: $LIST_FILE_DIFF"
     echo "Run all: $RUN_ALL"
     echo "Nightly: $NIGHTLY"
+
+    cd .buildkite
     minijinja-cli test-template.j2 test-pipeline.yaml -D branch="$BUILDKITE_BRANCH" -D list_file_diff="$LIST_FILE_DIFF" -D run_all="$RUN_ALL" -D nightly="$NIGHTLY" > pipeline.yml
     cat pipeline.yml
     buildkite-agent pipeline upload pipeline.yml

@@ -17,8 +17,8 @@ vLLM leverages Buildkite for CI workflow. Whenever a commit is pushed to the vLL
 Build Process Overview:
 
 - Bootstrap Step:
-    - Executed via `scripts/ci_aws_bootstrap.sh`.
-    - Utilizes a CI Jinja2 template (`scripts/test-template-aws.j2`) along with the [list of tests from vLLM](https://github.com/vllm-project/vllm/blob/main/.buildkite/test-pipeline.yaml) to render a Buildkite YAML configuration that defines all build/test steps and their configurations.
+    - Executed via `scripts/bootstrap.sh`.
+    - Utilizes a CI Jinja2 template (`scripts/test-template-ci.j2`) along with the [list of tests from vLLM](https://github.com/vllm-project/vllm/blob/main/.buildkite/test-pipeline.yaml) to render a Buildkite YAML configuration that defines all build/test steps and their configurations.
     - Uploads the rendered YAML to Buildkite to initiate the build.
     - Note: We are transitioning to a custom Buildkite pipeline generator to replace the Jinja2 template rendering soon.
 

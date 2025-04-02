@@ -33,7 +33,7 @@ upload_pipeline() {
     fi
 
     # If pipeline is CI
-    curl -o .buildkite/test-template.j2 https://raw.githubusercontent.com/vllm-project/buildkite-ci/"$VLLM_CI_BRANCH"/scripts/test-template-aws.j2?$(date +%s)
+    curl -o .buildkite/test-template-ci.j2 https://raw.githubusercontent.com/vllm-project/buildkite-ci/"$VLLM_CI_BRANCH"/scripts/test-template-ci.j2?$(date +%s)
 
     # (WIP) Use pipeline generator instead of jinja template
     if [ -e ".buildkite/pipeline_generator/pipeline_generator.py" ]; then

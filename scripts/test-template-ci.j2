@@ -148,7 +148,7 @@ steps:
     depends_on: image-build
     {% endif %}
     agents:
-      {% if step.label == "Core" or step.label == "Regression Test" or step.label == "Examples Test" %}
+      {% if step.label == "Core Test" or step.label == "Regression Test" or step.label == "Examples Test" %}
       queue: moc-a100
       {% elif step.label == "Documentation Build" %}
       queue: small_cpu_queue_premerge
@@ -177,7 +177,7 @@ steps:
           limit: 1
     {% if step.num_nodes < 2 %}
     plugins:
-      {% if step.label == "Core" or step.label == "Regression Test" or step.label == "Examples Test" %}
+      {% if step.label == "Core Test" or step.label == "Regression Test" or step.label == "Examples Test" %}
       - kubernetes:
           podSpec:
             priorityClassName: ci

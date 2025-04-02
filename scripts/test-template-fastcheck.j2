@@ -299,7 +299,8 @@ steps:
     depends_on: ~
     steps:    
       - label: "AMD: :docker: build image"
-        soft_fail: false
+        depends_on: ~
+        soft_fail: true
         commands:
           - "grep -i 'from base as test' docker/Dockerfile.rocm && docker build --build-arg max_jobs=16 --tag {{ docker_image_amd }} -f docker/Dockerfile.rocm --target test --progress plain . || docker build --build-arg max_jobs=16 --tag {{ docker_image_amd }} -f docker/Dockerfile.rocm --progress plain ."
           - "docker push {{ docker_image_amd }}"
@@ -330,6 +331,6 @@ steps:
         env:
           DOCKER_BUILDKIT: "1"
         priority: 100
-        soft_fail: false
+        soft_fail: true
     {% endif %}
     {% endfor %}

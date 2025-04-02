@@ -273,6 +273,7 @@ steps:
     depends_on: ~
     steps:       
       - label: "AMD: :docker: build image"
+        depends_on: ~
         soft_fail: true
         commands:
           # Handle the introduction of test target in Dockerfile.rocm

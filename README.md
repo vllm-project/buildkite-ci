@@ -43,7 +43,7 @@ Components of the stack for each Agent Queue:
 
 ## How to test changes in this repo
 1. Create a feature branch on this repo, say named `my-feature-branch`. If you can't create a feature branch, ping @khluu to add you into the repo.
-2. Once the branch is created, you can start making changes and commit to the branch. Also, please remember to change `main` to `my-feature-branch` here: https://github.com/vllm-project/buildkite-ci/blob/main/scripts/ci_aws_bootstrap.sh#L28
+2. Once the branch is created, you can start making changes and commit to the branch.
 3. After the changes are pushed to the branch, wait a few minutes, then create a new build on Buildkite with this environment variable `VLLM_CI_BRANCH=my-feature-branch` to test your changes against vLLM codebase.
 
 Please note that when creating a new build on Buildkite:

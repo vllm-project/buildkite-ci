@@ -370,7 +370,7 @@ steps:
       queue: tpu_queue
     commands: 
     - yes | docker system prune -a
-    - if [[ -f ".buildkite/run-tpu-test.sh" ]]; then bash .buildkite/scripts/hardware_ci/run-tpu-test.sh; fi
+    - if [[ -f ".buildkite/scripts/hardware_ci/run-tpu-test.sh" ]]; then bash .buildkite/scripts/hardware_ci/run-tpu-test.sh; fi
 
   - label: "TPU V1 Test"
     depends_on: ~
@@ -378,5 +378,5 @@ steps:
     agents:
       queue: tpu_queue
     commands:
-      - if [[ -f ".buildkite/run-tpu-v1-test.sh" ]]; then bash .buildkite/scripts/hardware_ci/run-tpu-v1-test.sh; fi
+      - if [[ -f ".buildkite/scripts/hardware_ci/run-tpu-v1-test.sh" ]]; then bash .buildkite/scripts/hardware_ci/run-tpu-v1-test.sh; fi
       - yes | docker system prune -a

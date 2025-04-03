@@ -39,7 +39,7 @@ steps:
     depends_on: run-neuron-test
     agents:
       queue: neuron
-    command: bash .buildkite/run-neuron-test.sh
+    command: bash .buildkite/scripts/hardware_ci/run-neuron-test.sh
     soft_fail: false
 
   {% for step in steps %}
@@ -155,7 +155,7 @@ steps:
     agents:
       queue: gpu_4_queue
     commands:
-      - ./.buildkite/run-multi-node-test.sh {{ (step.working_dir or default_working_dir) | safe  }} {{ step.num_nodes }} {{ step.num_gpus }} {{ docker_image }} {% for command in step.commands %}"{{ (command | join(" && ")) | safe }}" {% endfor %}
+      - ./.buildkite/scripts/run-multi-node-test.sh {{ (step.working_dir or default_working_dir) | safe  }} {{ step.num_nodes }} {{ step.num_gpus }} {{ docker_image }} {% for command in step.commands %}"{{ (command | join(" && ")) | safe }}" {% endfor %}
   {% endif %}
   {% endfor %}
 
@@ -230,7 +230,7 @@ steps:
     agents:
       queue: tpu_queue
     commands:
-      - if [[ -f ".buildkite/run-tpu-test.sh" ]]; then bash .buildkite/run-tpu-test.sh; fi
+      - if [[ -f ".buildkite/scripts/hardware_ci/run-tpu-test.sh" ]]; then bash .buildkite/scripts/hardware_ci/run-tpu-test.sh; fi
       - yes | docker system prune -a
 
   - label: "TPU V0 Test Notification"
@@ -263,7 +263,7 @@ steps:
     agents:
       queue: tpu_queue
     commands:
-      - if [[ -f ".buildkite/run-tpu-v1-test.sh" ]]; then bash .buildkite/run-tpu-v1-test.sh; fi
+      - if [[ -f ".buildkite/scripts/hardware_ci/run-tpu-v1-test.sh" ]]; then bash .buildkite/scripts/hardware_ci/run-tpu-v1-test.sh; fi
       - yes | docker system prune -a
 
   - label: "TPU V1 Test Notification"
@@ -293,7 +293,7 @@ steps:
     soft_fail: true
     agents:
       queue: gh200_queue
-    command: nvidia-smi && bash .buildkite/run-gh200-test.sh
+    command: nvidia-smi && bash .buildkite/scripts/hardware_ci/run-gh200-test.sh
 
   - group: "AMD Tests"
     depends_on: ~
@@ -327,7 +327,7 @@ steps:
          {% else %}
            queue: amd_mi300_1
          {% endif%}
-        command: bash .buildkite/run-amd-test.sh "(command rocm-smi || true) && export VLLM_LOGGING_LEVEL=DEBUG && export VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1 && cd {{ (step.working_dir or default_working_dir) | safe  }} ; {{ step.command  or (step.commands | join(" && ")) | safe }}"
+        command: bash .buildkite/scripts/hardware_ci/run-amd-test.sh "(command rocm-smi || true) && export VLLM_LOGGING_LEVEL=DEBUG && export VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1 && cd {{ (step.working_dir or default_working_dir) | safe  }} ; {{ step.command  or (step.commands | join(" && ")) | safe }}"
         env:
           DOCKER_BUILDKIT: "1"
         priority: 100

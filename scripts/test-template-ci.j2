@@ -163,7 +163,7 @@ steps:
       {% endif %}
     {% if step.num_nodes >= 2%} {# for multi-node test #}
     commands:
-      - ./.buildkite/run-multi-node-test.sh {{ (step.working_dir or default_working_dir) | safe  }} {{ step.num_nodes }} {{ step.num_gpus }} {{ docker_image }} {% for command in step.commands %}"{{ (command | join(" && ")) | safe }}" {% endfor %}
+      - ./.buildkite/scripts/run-multi-node-test.sh {{ (step.working_dir or default_working_dir) | safe  }} {{ step.num_nodes }} {{ step.num_gpus }} {{ docker_image }} {% for command in step.commands %}"{{ (command | join(" && ")) | safe }}" {% endfor %}
     {% endif %}
     soft_fail: {{ step.soft_fail or false }}
     {% if step.parallelism %}
@@ -277,7 +277,7 @@ steps:
          {% else %}
            queue: amd_mi300_1
          {% endif%}
-        command: bash .buildkite/run-amd-test.sh "(command rocm-smi || true) && export VLLM_LOGGING_LEVEL=DEBUG && export VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1 && cd {{ (step.working_dir or default_working_dir) | safe  }} ; {{ step.command  or (step.commands | join(" && ")) | safe }}"
+        command: bash .buildkite/scripts/hardware_ci/run-amd-test.sh "(command rocm-smi || true) && export VLLM_LOGGING_LEVEL=DEBUG && export VLLM_ALLOW_DEPRECATED_BEAM_SEARCH=1 && cd {{ (step.working_dir or default_working_dir) | safe  }} ; {{ step.command  or (step.commands | join(" && ")) | safe }}"
         env:
           DOCKER_BUILDKIT: "1"
         priority: 100
@@ -289,7 +289,7 @@ steps:
     depends_on: ~
     agents:
       queue: neuron
-    command: bash .buildkite/run-neuron-test.sh
+    command: bash .buildkite/scripts/hardware_ci/run-neuron-test.sh
     soft_fail: true
 
   - block: "Run Intel CPU test"
@@ -301,21 +301,21 @@ steps:
     soft_fail: true
     agents:
       queue: intel-cpu
-    command: bash .buildkite/run-cpu-test.sh
+    command: bash .buildkite/scripts/hardware_ci/run-cpu-test.sh
 
   - label: "Intel HPU Test"
     depends_on: ~
     soft_fail: true
     agents:
       queue: intel-hpu
-    command: bash .buildkite/run-hpu-test.sh
+    command: bash .buildkite/scripts/hardware_ci/run-hpu-test.sh
   
   - label: "Intel GPU Test"
     soft_fail: true
     depends_on: ~
     agents:
       queue: intel-gpu
-    command: bash .buildkite/run-xpu-test.sh
+    command: bash .buildkite/scripts/hardware_ci/run-xpu-test.sh
 
   {% if branch == "main" %}
   - label: "IBM Power(ppc64le) CPU Test"
@@ -323,7 +323,7 @@ steps:
     soft_fail: true
     agents:
       queue: ibm-ppc64le
-    command: bash .buildkite/run-cpu-test-ppc64le.sh
+    command: bash .buildkite/scripts/hardware_ci/run-cpu-test-ppc64le.sh
   {% endif %}
 
   {% if nightly == "1" %}
@@ -332,7 +332,7 @@ steps:
     soft_fail: true
     agents:
       queue: gh200_queue
-    command: nvidia-smi && bash .buildkite/run-gh200-test.sh
+    command: nvidia-smi && bash .buildkite/scripts/hardware_ci/run-gh200-test.sh
   {% endif %}
 
   - label: "TPU V0 Test"
@@ -342,7 +342,7 @@ steps:
       queue: tpu_queue
     commands: 
     - yes | docker system prune -a
-    - if [[ -f ".buildkite/run-tpu-test.sh" ]]; then bash .buildkite/run-tpu-test.sh; fi
+    - if [[ -f ".buildkite/scripts/hardware_ci/run-tpu-test.sh" ]]; then bash .buildkite/scripts/hardware_ci/run-tpu-test.sh; fi
 
   - label: "TPU V1 Test"
     depends_on: ~
@@ -350,5 +350,5 @@ steps:
     agents:
       queue: tpu_queue
     commands:
-      - if [[ -f ".buildkite/run-tpu-v1-test.sh" ]]; then bash .buildkite/run-tpu-v1-test.sh; fi
+      - if [[ -f ".buildkite/scripts/hardware_ci/run-tpu-v1-test.sh" ]]; then bash .buildkite/scripts/hardware_ci/run-tpu-v1-test.sh; fi
       - yes | docker system prune -a

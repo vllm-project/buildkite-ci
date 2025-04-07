@@ -228,7 +228,7 @@ steps:
     depends_on: block-tpu-v0
     soft_fail: true
     agents:
-      queue: tpu_queue
+      queue: tpu_v5_queue
     commands:
       - if [[ -f ".buildkite/scripts/hardware_ci/run-tpu-test.sh" ]]; then bash .buildkite/scripts/hardware_ci/run-tpu-test.sh; fi
       - yes | docker system prune -a
@@ -236,14 +236,14 @@ steps:
   - label: "TPU V0 Test Notification"
     depends_on: run-tpu-v0-test
     agents:
-      queue: tpu_queue
+      queue: tpu_v5_queue
     commands: |
       if [ $$(buildkite-agent step get "outcome" --step "run-tpu-v0-test") != "passed" ]; then
          cat <<- YAML | buildkite-agent pipeline upload
          steps:
            - label: "Notify owners about failing test"
              agents:
-               queue: tpu_queue
+               queue: tpu_v5_queue
              command: echo "TPU V0 Test failed"
              notify:
                - slack:
@@ -261,7 +261,7 @@ steps:
     depends_on: block-tpu-v1
     soft_fail: true
     agents:
-      queue: tpu_queue
+      queue: tpu_v5_queue
     commands:
       - if [[ -f ".buildkite/scripts/hardware_ci/run-tpu-v1-test.sh" ]]; then bash .buildkite/scripts/hardware_ci/run-tpu-v1-test.sh; fi
       - yes | docker system prune -a
@@ -269,14 +269,14 @@ steps:
   - label: "TPU V1 Test Notification"
     depends_on: run-tpu-v1-test
     agents:
-      queue: tpu_queue
+      queue: tpu_v5_queue
     commands: |
       if [ $$(buildkite-agent step get "outcome" --step "run-tpu-v1-test") != "passed" ]; then
          cat <<- YAML | buildkite-agent pipeline upload
          steps:
            - label: "Notify owners about failing test"
              agents:
-               queue: tpu_queue
+               queue: tpu_v5_queue
              command: echo "TPU V1 Test failed"
              notify:
                - slack:

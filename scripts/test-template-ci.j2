@@ -182,7 +182,6 @@ steps:
       {% if step.label == "Core Test" or step.label == "Async Engine, Inputs, Utils, Worker Test" or step.label == "Regression Test" or step.label == "Examples Test" %}
       - kubernetes:
           podSpec:
-            priorityClassName: ci
             containers:
             - image: {{ docker_image }}
               command:

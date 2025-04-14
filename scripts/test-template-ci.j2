@@ -343,8 +343,29 @@ steps:
                      - "vLLM#vllm-ci-on-power"
       YAML
       fi
-  {% endif %}
 
+  {% else %}
+  - block: "Run IBM Power(ppc64le) CPU Test"
+    depends_on: ~
+    key: block-ibm-ppc64-test
+
+  - label: "IBM Power(ppc64le) CPU Test"
+    depends_on: block-ibm-ppc64-test
+    soft_fail: true
+    agents:
+      queue: ibm-ppc64le
+    command: bash .buildkite/scripts/hardware_ci/run-cpu-test-ppc64le.sh
+  {% endif %}
+ 
+  {% if branch == "main" or "s390x" in branch %}
+  - label: "IBM Z (s390x) CPU Test"
+    depends_on: ~
+    soft_fail: true
+    agents:
+      queue: ibm_s390x
+    command: bash .buildkite/scripts/hardware_ci/run-cpu-test-s390x.sh
+  {% endif %}
+ 
   {% if nightly == "1" %}
   - label: "GH200 Test"
     depends_on: ~
@@ -358,7 +379,7 @@ steps:
     depends_on: ~
     soft_fail: True
     agents:
-      queue: tpu_queue
+      queue: tpu_v5_queue
     commands: 
     - yes | docker system prune -a
     - if [[ -f ".buildkite/scripts/hardware_ci/run-tpu-test.sh" ]]; then bash .buildkite/scripts/hardware_ci/run-tpu-test.sh; fi
@@ -367,7 +388,7 @@ steps:
     depends_on: ~
     soft_fail: true
     agents:
-      queue: tpu_queue
+      queue: tpu_v6e_queue
     commands:
       - if [[ -f ".buildkite/scripts/hardware_ci/run-tpu-v1-test.sh" ]]; then bash .buildkite/scripts/hardware_ci/run-tpu-v1-test.sh; fi
       - yes | docker system prune -a

@@ -269,7 +269,7 @@ steps:
           queue: amd-cpu
 
     {% for step in steps %}
-    {% if step.mirror_hardwares and "amd\_experimental" in step.mirror_hardwares %}
+    {% if step.mirror_hardwares and 'amd_experimental' in step.mirror_hardwares %}
       - label: "AMD: {{ step.label }}"
         depends_on: amd-build
         agents:

@@ -75,6 +75,12 @@ variable "worker_clusters" {
     # One per TPU shape this cluster can run, keyed by node pool name. Names
     # have to be unique across all clusters, not just within one, because the
     # pools are flattened into a single map to create them.
+    #
+    # Named <generation>-<chips per host>-<topology>, e.g. v6e-8t-2x4. The
+    # middle part is the machine type's suffix, and it is what makes the name
+    # unique: a topology does not determine the machine type. 2x4 is eight
+    # chips either as one ct6e-standard-8t or as two ct6e-standard-4t, and
+    # those differ in pod count, chips per pod and JobSet parallelism.
     tpu_node_pools = optional(map(object({
       # The machine type is the VM, the topology the slice asked of it. Matching
       # shapes mean one VM holds the whole slice; a larger topology means one

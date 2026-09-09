@@ -36,7 +36,7 @@ worker_clusters = {
     # reservation, since those chips stay with one shape once booted, so it is
     # kept small.
     tpu_node_pools = {
-      v6e-1x1 = {
+      v6e-1t-1x1 = {
         machine_type     = "ct6e-standard-1t"
         topology         = "1x1"
         reservation_name = "cloudtpu-20260828173000-731402396"
@@ -45,7 +45,7 @@ worker_clusters = {
         min_nodes = 2
         max_nodes = 26
       }
-      v6e-2x4 = {
+      v6e-8t-2x4 = {
         machine_type     = "ct6e-standard-8t"
         topology         = "2x4"
         reservation_name = "cloudtpu-20260828173000-731402396"

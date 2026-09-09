@@ -50,3 +50,36 @@ variable "enable_private_endpoint" {
   description = "Whether the control plane is reachable only from inside the VPC. False while the cluster is administered from laptops and from Buildkite agents that live outside it."
   default     = false
 }
+
+variable "image_repositories" {
+  type = list(object({
+    location   = string
+    repository = string
+  }))
+  description = "Artifact Registry repositories in project_id that manager and worker nodes may pull from. Grants are per repository; a repository absent here is not readable."
+  default     = []
+}
+
+variable "worker_clusters" {
+  type = map(object({
+    project                = string
+    location               = string
+    network                = string
+    subnetwork             = string
+    master_ipv4_cidr_block = string
+
+    system_machine_type = optional(string, "e2-standard-4")
+    system_min_nodes    = optional(number, 1)
+    system_max_nodes    = optional(number, 3)
+  }))
+  description = "Worker clusters keyed by a short name. location is a region; the cluster pins no zones, because only a TPU node cares which zone it is in and the compute class that asks for one pins it there."
+  default     = {}
+
+  validation {
+    condition = alltrue([
+      for name, w in var.worker_clusters :
+      length(regexall("^[a-z0-9]+-[a-z0-9]+[0-9]$", w.location)) > 0
+    ])
+    error_message = "worker_clusters[*].location must be a region, not a zone: a zone here silently gets a zonal control plane, and changing it later rebuilds the cluster."
+  }
+}

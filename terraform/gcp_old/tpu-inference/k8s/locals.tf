@@ -10,10 +10,40 @@ locals {
   # Workload Identity instead.
   #
   # container.defaultNodeServiceAccount is GKE's maintained definition of that
-  # minimum. artifactregistry.reader is not in it and has to be added
-  # separately; a node needs it to pull private images.
-  manager_node_service_account_roles = toset([
+  # minimum. It does not cover pulling private images; that is granted per
+  # repository in iam.tf, from var.image_repositories, to both node accounts.
+  node_service_account_roles = toset([
     "roles/container.defaultNodeServiceAccount",
-    "roles/artifactregistry.reader",
   ])
+
+  manager_repository_bindings = {
+    for repo in var.image_repositories :
+    "${repo.location}/${repo.repository}" => repo
+  }
+
+  worker_node_role_bindings = {
+    for item in flatten([
+      for worker_name, worker in var.worker_clusters : [
+        for role in local.node_service_account_roles : {
+          key         = "${worker_name}/${role}"
+          worker_name = worker_name
+          project     = worker.project
+          role        = role
+        }
+      ]
+    ]) : item.key => item
+  }
+
+  worker_node_repository_bindings = {
+    for item in flatten([
+      for worker_name, worker in var.worker_clusters : [
+        for repo in var.image_repositories : {
+          key         = "${worker_name}/${repo.location}/${repo.repository}"
+          worker_name = worker_name
+          location    = repo.location
+          repository  = repo.repository
+        }
+      ]
+    ]) : item.key => item
+  }
 }

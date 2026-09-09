@@ -83,3 +83,34 @@ variable "worker_clusters" {
     error_message = "worker_clusters[*].location must be a region, not a zone: a zone here silently gets a zonal control plane, and changing it later rebuilds the cluster."
   }
 }
+
+# Declared so prod.auto.tfvars can hold it, but read by scripts/, not by any
+# resource here. The clusters and the objects inside them come from one file:
+# a ComputeClass names a worker key and a reservation, and keeping that beside
+# the cluster it belongs to is what stops the two drifting.
+variable "tpu_compute_classes" {
+  type = map(object({
+    # Key of the worker_clusters entry this belongs to.
+    worker = string
+
+    # GKE's accelerator type, "tpu-v6e-slice" for Trillium. With count and
+    # topology this is the whole shape request; GKE picks the machine type.
+    accelerator_type = string
+    # Chips on one node. A slice's chips divided by this is how many nodes GKE
+    # puts in it, so the pair is what decides single- or multi-host.
+    chips_per_node = number
+    topology       = string
+
+    reservation_name    = string
+    reservation_project = optional(string)
+    # The reservation is zonal, and this is the only zone pinning in the lane -
+    # the cluster deliberately has none.
+    zones = list(string)
+
+    # Guaranteed capacity for this shape, in nodes. Read by the Kueue
+    # generator, not a floor GKE holds.
+    nominal_nodes = number
+  }))
+  description = "TPU shapes a worker can provision on demand, one ComputeClass each."
+  default     = {}
+}

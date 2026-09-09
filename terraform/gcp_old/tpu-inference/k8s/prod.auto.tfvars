@@ -32,6 +32,30 @@ worker_clusters = {
   }
 }
 
+# Reservation cloudtpu-20260828173000-731402396 in us-east5-a: 128 v6e chips,
+# 102 in use, 26 free. Those 26 are the budget for every shape here - they are
+# not divided between them, which is the point of provisioning on demand.
+tpu_compute_classes = {
+  v6e-1x1 = {
+    worker           = "us-east5"
+    accelerator_type = "tpu-v6e-slice"
+    chips_per_node   = 1
+    topology         = "1x1"
+    reservation_name = "cloudtpu-20260828173000-731402396"
+    zones            = ["us-east5-a"]
+    nominal_nodes    = 10
+  }
+  v6e-2x4 = {
+    worker           = "us-east5"
+    accelerator_type = "tpu-v6e-slice"
+    chips_per_node   = 8
+    topology         = "2x4"
+    reservation_name = "cloudtpu-20260828173000-731402396"
+    zones            = ["us-east5-a"]
+    nominal_nodes    = 2
+  }
+}
+
 labels = {
   environment = "production"
   workload    = "tpu-ci"

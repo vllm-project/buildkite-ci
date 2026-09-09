@@ -71,8 +71,31 @@ variable "worker_clusters" {
     system_machine_type = optional(string, "e2-standard-4")
     system_min_nodes    = optional(number, 1)
     system_max_nodes    = optional(number, 3)
+
+    # One per TPU shape this cluster can run, keyed by node pool name. Names
+    # have to be unique across all clusters, not just within one, because the
+    # pools are flattened into a single map to create them.
+    tpu_node_pools = optional(map(object({
+      # The machine type is the VM, the topology the slice asked of it. Matching
+      # shapes mean one VM holds the whole slice; a larger topology means one
+      # slice across several, which GKE only builds from a placement policy.
+      machine_type = string
+      topology     = string
+
+      reservation_name = string
+      # The reservation is zonal and the cluster pins no zones, so this is the
+      # only thing keeping a node out of a zone that cannot serve it.
+      zone = string
+
+      # Scale-down floor: nodes this shape keeps once it has booted them. Those
+      # chips are unavailable to the other shapes from then on, idle or not.
+      min_nodes = number
+      # Above this pool's share of the reservation, so the shapes compete for
+      # free chips; the reservation running out is what stops a scale-up.
+      max_nodes = number
+    })), {})
   }))
-  description = "Worker clusters keyed by a short name. location is a region; the cluster pins no zones, because only a TPU node cares which zone it is in and the compute class that asks for one pins it there."
+  description = "Worker clusters keyed by a short name. location is a region; the cluster pins no zones, because only a TPU node cares which zone it is in and its own node pool pins it there."
   default     = {}
 
   validation {
@@ -84,33 +107,3 @@ variable "worker_clusters" {
   }
 }
 
-# Declared so prod.auto.tfvars can hold it, but read by scripts/, not by any
-# resource here. The clusters and the objects inside them come from one file:
-# a ComputeClass names a worker key and a reservation, and keeping that beside
-# the cluster it belongs to is what stops the two drifting.
-variable "tpu_compute_classes" {
-  type = map(object({
-    # Key of the worker_clusters entry this belongs to.
-    worker = string
-
-    # GKE's accelerator type, "tpu-v6e-slice" for Trillium. With count and
-    # topology this is the whole shape request; GKE picks the machine type.
-    accelerator_type = string
-    # Chips on one node. A slice's chips divided by this is how many nodes GKE
-    # puts in it, so the pair is what decides single- or multi-host.
-    chips_per_node = number
-    topology       = string
-
-    reservation_name    = string
-    reservation_project = optional(string)
-    # The reservation is zonal, and this is the only zone pinning in the lane -
-    # the cluster deliberately has none.
-    zones = list(string)
-
-    # Guaranteed capacity for this shape, in nodes. Read by the Kueue
-    # generator, not a floor GKE holds.
-    nominal_nodes = number
-  }))
-  description = "TPU shapes a worker can provision on demand, one ComputeClass each."
-  default     = {}
-}

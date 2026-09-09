@@ -21,7 +21,7 @@ image_repositories = [
 ]
 
 # Keyed by region. The cluster pins no zones; the reservation's zone
-# (us-east5-a) belongs to the compute class that draws on it.
+# (us-east5-a) belongs to the TPU pools that draw on it.
 worker_clusters = {
   us-east5 = {
     project                = "cloud-ullm-inference-ci-cd"
@@ -29,30 +29,34 @@ worker_clusters = {
     network                = "projects/cloud-ullm-inference-ci-cd/global/networks/default"
     subnetwork             = "projects/cloud-ullm-inference-ci-cd/regions/us-east5/subnetworks/default"
     master_ipv4_cidr_block = "172.16.0.32/28"
-  }
-}
 
-# Reservation cloudtpu-20260828173000-731402396 in us-east5-a: 128 v6e chips,
-# 102 in use, 26 free. Those 26 are the budget for every shape here - they are
-# not divided between them, which is the point of provisioning on demand.
-tpu_compute_classes = {
-  v6e-1x1 = {
-    worker           = "us-east5"
-    accelerator_type = "tpu-v6e-slice"
-    chips_per_node   = 1
-    topology         = "1x1"
-    reservation_name = "cloudtpu-20260828173000-731402396"
-    zones            = ["us-east5-a"]
-    nominal_nodes    = 10
-  }
-  v6e-2x4 = {
-    worker           = "us-east5"
-    accelerator_type = "tpu-v6e-slice"
-    chips_per_node   = 8
-    topology         = "2x4"
-    reservation_name = "cloudtpu-20260828173000-731402396"
-    zones            = ["us-east5-a"]
-    nominal_nodes    = 2
+    # Reservation cloudtpu-20260828173000-731402396 in us-east5-a: 128 v6e
+    # chips, 102 in use, 26 free. max_nodes sums to more than 26 so the shapes
+    # compete for what is free. min_nodes is the part that does partition the
+    # reservation, since those chips stay with one shape once booted, so it is
+    # kept small.
+    tpu_node_pools = {
+      v6e-1x1 = {
+        machine_type     = "ct6e-standard-1t"
+        topology         = "1x1"
+        reservation_name = "cloudtpu-20260828173000-731402396"
+        zone             = "us-east5-a"
+
+        min_nodes = 2
+        max_nodes = 26
+      }
+      v6e-2x4 = {
+        machine_type     = "ct6e-standard-8t"
+        topology         = "2x4"
+        reservation_name = "cloudtpu-20260828173000-731402396"
+        zone             = "us-east5-a"
+
+        # No floor: eight chips is too much of what is free to leave parked, so
+        # this shape boots a node per job.
+        min_nodes = 0
+        max_nodes = 3
+      }
+    }
   }
 }
 

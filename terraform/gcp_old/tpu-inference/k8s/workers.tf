@@ -3,10 +3,10 @@
 # taint and COMPACT placement with an explicit topology - none of which
 # Autopilot lets through.
 #
-# The control plane is regional so that it survives a zone going away, and no
-# node_locations is set anywhere here: this cluster has no opinion about zones.
-# The one thing that does is a TPU node, which must land in its reservation's
-# zone, and that is pinned by the compute class that asks for it.
+# The control plane is regional so that it survives a zone going away, and the
+# cluster sets no node_locations: it has no opinion about zones. The one thing
+# that does is a TPU node, which must land in its reservation's zone, and each
+# TPU pool pins that for itself.
 
 resource "google_container_cluster" "worker" {
   for_each = var.worker_clusters
@@ -121,6 +121,98 @@ resource "google_container_node_pool" "worker_system" {
     metadata = {
       disable-legacy-endpoints = "true"
     }
+  }
+}
+
+# One pool per TPU shape. min_nodes is a scale-down floor, so a shape keeps
+# nodes it has already booted; GKE creates them only for a pending pod, never
+# to reach the floor. max_nodes exceeds this pool's share of the reservation,
+# so the shapes compete for what is free rather than each owning a fixed slice.
+resource "google_container_node_pool" "worker_tpu" {
+  for_each = local.tpu_node_pools
+
+  name     = each.key
+  project  = each.value.cluster_project
+  cluster  = google_container_cluster.worker[each.value.worker].name
+  location = each.value.cluster_location
+
+  # The cluster pins no zones, so without this the pool spreads across the
+  # region and lands in zones that cannot serve the reservation.
+  node_locations = [each.value.zone]
+
+  # total_, not the per-zone pair: one zone makes them equal today, but adding
+  # a second would quietly double a per-zone floor.
+  autoscaling {
+    total_min_node_count = each.value.min_nodes
+    total_max_node_count = each.value.max_nodes
+  }
+
+  management {
+    auto_repair  = true
+    auto_upgrade = true
+  }
+
+  node_config {
+    machine_type    = each.value.machine_type
+    service_account = google_service_account.worker_nodes[each.value.worker].email
+    oauth_scopes    = ["https://www.googleapis.com/auth/cloud-platform"]
+
+    workload_metadata_config {
+      mode = "GKE_METADATA"
+    }
+
+    # A test image here is tens of gigabytes and a pod reads part of it, so
+    # starting before the pull finishes is most of the cold start.
+    gcfs_config {
+      enabled = true
+    }
+
+    labels = {
+      "tpu-ci.google.com/worker"  = each.value.worker
+      "tpu-ci.google.com/profile" = each.key
+    }
+
+    # Nothing lands on a TPU node unless it asked for one.
+    taint {
+      key    = "google.com/tpu"
+      value  = "present"
+      effect = "NO_SCHEDULE"
+    }
+
+    # The reservation is specificReservationRequired, so a node without this
+    # affinity does not draw from it - it asks for on-demand capacity and fails.
+    reservation_affinity {
+      consume_reservation_type = "SPECIFIC_RESERVATION"
+      key                      = "compute.googleapis.com/reservation-name"
+      values                   = [each.value.reservation_name]
+    }
+
+    metadata = {
+      disable-legacy-endpoints = "true"
+    }
+  }
+
+  # A slice wider than one VM needs its topology on a placement policy; GKE then
+  # creates one node per host and scales the pool atomically.
+  dynamic "placement_policy" {
+    for_each = each.value.is_multi_host ? [1] : []
+    content {
+      type         = "COMPACT"
+      tpu_topology = each.value.topology
+    }
+  }
+
+  lifecycle {
+    ignore_changes = [
+      # GKE turns SMT off on a TPU host and reports threads_per_core back.
+      # Untracked that reads as "remove advanced_machine_features", which is
+      # ForceNew - a plan that rebuilds the pool and drops its chips.
+      node_config[0].advanced_machine_features,
+      node_config[0].guest_accelerator,
+      node_config[0].kubelet_config,
+      node_config[0].shielded_instance_config,
+      upgrade_settings,
+    ]
   }
 }
 

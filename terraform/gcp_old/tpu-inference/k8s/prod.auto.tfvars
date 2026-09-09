@@ -20,6 +20,12 @@ image_repositories = [
   { location = "us-central1", repository = "vllm-on-tpu-docker-container" },
 ]
 
+kueue_version  = "0.19.0"
+jobset_version = "0.12.0"
+
+auth_plugin_image       = "gcr.io/google.com/cloudsdktool/google-cloud-cli:584.0.0"
+auth_plugin_source_path = "/usr/lib/google-cloud-sdk/bin/gke-gcloud-auth-plugin"
+
 # Keyed by region. The cluster pins no zones; the reservation's zone
 # (us-east5-a) belongs to the TPU pools that draw on it.
 worker_clusters = {
@@ -31,10 +37,11 @@ worker_clusters = {
     master_ipv4_cidr_block = "172.16.0.32/28"
 
     # Reservation cloudtpu-20260828173000-731402396 in us-east5-a: 128 v6e
-    # chips, 102 in use, 26 free. max_nodes sums to more than 26 so the shapes
-    # compete for what is free. min_nodes is the part that does partition the
-    # reservation, since those chips stay with one shape once booted, so it is
-    # kept small.
+    # chips, 102 in use, 26 free. nominal_nodes splits those 26 between the
+    # shapes so neither starves the other; max_nodes sums to more, so a shape
+    # borrowing the cohort's idle quota can still boot the nodes for it.
+    # min_nodes is the part that really does partition the reservation, since
+    # those chips stay with one shape once booted, so it is kept small.
     tpu_node_pools = [
       {
         machine_type     = "ct6e-standard-1t"
@@ -42,8 +49,9 @@ worker_clusters = {
         reservation_name = "cloudtpu-20260828173000-731402396"
         zone             = "us-east5-a"
 
-        min_nodes = 2
-        max_nodes = 26
+        min_nodes     = 2
+        nominal_nodes = 18
+        max_nodes     = 26
       },
       {
         machine_type     = "ct6e-standard-8t"
@@ -54,7 +62,10 @@ worker_clusters = {
         # No floor: eight chips is too much of what is free to leave parked, so
         # this shape boots a node per job.
         min_nodes = 0
-        max_nodes = 3
+        # One slice, which is what the disagg benchmark takes. Room for two more
+        # by borrowing whatever the single-chip queue is not using.
+        nominal_nodes = 1
+        max_nodes     = 3
       },
     ]
   }

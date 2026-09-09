@@ -4,6 +4,16 @@ locals {
     component  = "tpu-ci"
   })
 
+  # The Kueue controller on the manager cluster, as IAM sees it. Workload
+  # Identity federates a Kubernetes service account into a principal in its own
+  # right, so this can hold roles without a Google service account to
+  # impersonate. The name is Kueue's own and is fixed by its release manifests.
+  kueue_controller_principal = join("", [
+    "principal://iam.googleapis.com/projects/${data.google_project.manager.number}",
+    "/locations/global/workloadIdentityPools/${var.project_id}.svc.id.goog",
+    "/subject/ns/kueue-system/sa/kueue-controller-manager",
+  ])
+
   # Every cluster's pools in one map, since one resource creates them all.
   #
   # A pool is named for its shape - the machine type and the topology asked of

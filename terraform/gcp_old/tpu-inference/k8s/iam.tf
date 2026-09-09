@@ -51,3 +51,22 @@ resource "google_artifact_registry_repository_iam_member" "worker_nodes" {
   role       = "roles/artifactregistry.reader"
   member     = "serviceAccount:${google_service_account.worker_nodes[each.value.worker_name].email}"
 }
+
+# Lets the manager's Kueue controller reach a worker's API server through
+# Connect Gateway. It authenticates as its Kubernetes service account directly,
+# with no Google service account in between, so there is no key and nothing to
+# rotate; gke-gcloud-auth-plugin turns that identity into the gateway's token.
+#
+# Per membership, not per project: a gatewayEditor on the project would also be
+# an editor of every cluster registered to the fleet later. What the controller
+# may then do inside the worker is the kueue-multikueue-remote ClusterRole,
+# which the generated manifests bind to this same principal.
+resource "google_gke_hub_membership_iam_member" "kueue_manager_gateway" {
+  for_each = var.worker_clusters
+
+  project       = each.value.project
+  location      = google_container_cluster.worker[each.key].fleet[0].membership_location
+  membership_id = google_container_cluster.worker[each.key].fleet[0].membership_id
+  role          = "roles/gkehub.gatewayEditor"
+  member        = local.kueue_controller_principal
+}

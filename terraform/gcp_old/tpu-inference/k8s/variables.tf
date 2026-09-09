@@ -60,6 +60,31 @@ variable "image_repositories" {
   default     = []
 }
 
+# The four variables below are read by scripts/generate_manifests.py, not by
+# any resource here. They live in the same tfvars so that the cluster and what
+# runs on it are described in one place and change in one review, and so that
+# `terraform validate` type-checks them.
+
+variable "kueue_version" {
+  type        = string
+  description = "Kueue release to install, without the leading v. Its manifests are fetched from the GitHub release at deploy time; a tag is immutable, so pinning one pins the bytes."
+}
+
+variable "jobset_version" {
+  type        = string
+  description = "JobSet release to install, without the leading v. Kueue's jobset integration needs the CRD present, so this is installed first."
+}
+
+variable "auth_plugin_image" {
+  type        = string
+  description = "Image the manager's Kueue controller copies its Connect Gateway credential plugin out of. The Google CLI image is the only place Google publishes gke-gcloud-auth-plugin as a container; the binary is static, so it runs in Kueue's distroless image."
+}
+
+variable "auth_plugin_source_path" {
+  type        = string
+  description = "Path to the credential plugin inside auth_plugin_image."
+}
+
 variable "worker_clusters" {
   type = map(object({
     project                = string
@@ -76,7 +101,7 @@ variable "worker_clusters" {
     # the node pool's name is its shape - <machine type>-<topology>, e.g.
     # ct6e-standard-8t-2x4 - and locals.tf builds it from the two fields below
     # rather than taking it from here, so it cannot name hardware the pool does
-    # not have.
+    # not have. generate_manifests.py names the shape's Kueue queue the same way.
     tpu_node_pools = optional(list(object({
       # The machine type is the VM, the topology the slice asked of it. Both are
       # needed because a topology does not imply a machine type: 2x4 is eight
@@ -96,6 +121,15 @@ variable "worker_clusters" {
       # Above this pool's share of the reservation, so the shapes compete for
       # free chips; the reservation running out is what stops a scale-up.
       max_nodes = number
+
+      # This shape's share of the reservation, and the only one of the three
+      # counts that no resource here reads: generate_manifests.py turns it into
+      # the nominalQuota of the shape's ClusterQueue. Chips a shape can always
+      # get, so the shapes cannot starve each other, while the queues sit in
+      # one cohort and lend out whatever is idle. Summed across a cluster's
+      # pools it should be the chips the reservation actually has free, which
+      # is what max_nodes deliberately oversubscribes.
+      nominal_nodes = number
     })), [])
   }))
   description = "Worker clusters keyed by a short name. location is a region; the cluster pins no zones, because only a TPU node cares which zone it is in and its own node pool pins it there."

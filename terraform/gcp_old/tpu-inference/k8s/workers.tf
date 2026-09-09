@@ -131,10 +131,10 @@ resource "google_container_node_pool" "worker_system" {
 resource "google_container_node_pool" "worker_tpu" {
   for_each = local.tpu_node_pools
 
-  name     = each.key
-  project  = each.value.cluster_project
+  name     = each.value.name
+  project  = google_container_cluster.worker[each.value.worker].project
   cluster  = google_container_cluster.worker[each.value.worker].name
-  location = each.value.cluster_location
+  location = google_container_cluster.worker[each.value.worker].location
 
   # The cluster pins no zones, so without this the pool spreads across the
   # region and lands in zones that cannot serve the reservation.
@@ -169,7 +169,7 @@ resource "google_container_node_pool" "worker_tpu" {
 
     labels = {
       "tpu-ci.google.com/worker"  = each.value.worker
-      "tpu-ci.google.com/profile" = each.key
+      "tpu-ci.google.com/profile" = each.value.name
     }
 
     # Nothing lands on a TPU node unless it asked for one.

@@ -114,10 +114,32 @@ variable "agent_token_secret_id" {
   EOT
 }
 
-# The six variables below are read by scripts/generate_manifests.py, not by
+variable "analytics_token_secret_project" {
+  type        = string
+  description = "Project holding the Buildkite Test Engine token. Not this one: it belongs to the suite, which predates this fleet and is shared with the bare-metal lane."
+}
+
+variable "analytics_token_secret_id" {
+  type        = string
+  description = <<-EOT
+    Secret Manager secret holding the Buildkite Test Engine token.
+
+    Read by the launcher pod and forwarded into the workload, since a TPU pod
+    is the only thing that can see its own test output. On bare metal it comes
+    from the agent environment on the VM, which a pod has no equivalent of.
+
+    Named rather than defaulted because the grant is scoped to this one secret.
+  EOT
+}
+
+# The ten variables below are read by scripts/generate_manifests.py, not by
 # any resource here. They live in the same tfvars so that the cluster and what
 # runs on it are described in one place and change in one review, and so that
 # `terraform validate` type-checks them.
+#
+# None of them has a default, and none should: the generator reads the tfvars
+# file rather than this schema, so a default would be a value Terraform sees
+# and the generator does not.
 
 variable "kueue_version" {
   type        = string
@@ -153,6 +175,56 @@ variable "buildkite_queue" {
     profile and the launcher submits the real workload to Kueue, so the shape
     is chosen inside the cluster; a new shape is a regenerated profile
     registry, not another queue and another agent to run it.
+  EOT
+}
+
+variable "launcher_image" {
+  type        = string
+  description = <<-EOT
+    Image the launcher pod runs: the Google Cloud CLI image, for kubectl,
+    gcloud and gke-gcloud-auth-plugin, plus PyYAML, which it does not ship in
+    a form Python 3 can import.
+
+    Built by hand from kueue/launcher/Dockerfile - the command is in
+    kueue/launcher/cloudbuild.yaml. Nothing rebuilds it on a commit; it changes
+    only when the CLI version here does.
+  EOT
+}
+
+variable "allowed_image_repos" {
+  type        = list(string)
+  description = <<-EOT
+    Registry prefixes a workload image may come from.
+
+    WORKLOAD_IMAGE is the pipeline's to set, since CI images are built per
+    commit and the cluster cannot know the tag - which in a public repo means
+    a pull request's to set. The launcher refuses an image that does not start
+    with one of these. An empty list accepts any image, and only makes sense
+    before the queue is open to fork PRs.
+  EOT
+
+  # A prefix stopping at a repository name also matches a longer one, so
+  # "…/tpu-inference" would admit "…/tpu-inference-x" from anyone who can
+  # create a repository in that project.
+  validation {
+    condition     = alltrue([for r in var.allowed_image_repos : endswith(r, "/")])
+    error_message = "Every allowed_image_repos entry must end in / so it cannot match a longer repository name."
+  }
+}
+
+variable "tpu_test_max_seconds" {
+  type        = number
+  description = "How long a TPU workload may run once it has chips. The launcher puts it on the submitted workload as activeDeadlineSeconds, so a hung test releases the chips rather than holding them until the Buildkite step times out."
+}
+
+variable "tpu_total_max_seconds" {
+  type        = number
+  description = <<-EOT
+    How long a TPU step may take in total, queueing included.
+
+    The launcher waits for admission for whatever this leaves once a
+    full-length run is allowed for, so this and tpu_test_max_seconds are the
+    only deadlines worth choosing and every other one follows from them.
   EOT
 }
 

@@ -30,3 +30,24 @@ resource "google_secret_manager_secret_iam_member" "agent_token_sync" {
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${var.project_id}.svc.id.goog[${var.namespace}/secret-sync]"
 }
+
+# The Buildkite Test Engine token, in the test suite's own project. A data
+# source for the same reason as above: it predates this fleet and the
+# bare-metal agents read it too, so both lanes report into one suite.
+data "google_secret_manager_secret" "analytics_token" {
+  project   = var.analytics_token_secret_project
+  secret_id = var.analytics_token_secret_id
+}
+
+# Read straight by the launcher pod, not synced: unlike the agent token there
+# is no consumer that has to be pointed at a Kubernetes Secret, and a Secret
+# would be a copy of a credential sitting in the namespace between runs.
+#
+# Scoped to the one secret, not its project: that project is the suite's and
+# holds other people's secrets.
+resource "google_secret_manager_secret_iam_member" "launcher_analytics_token" {
+  project   = var.analytics_token_secret_project
+  secret_id = data.google_secret_manager_secret.analytics_token.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = local.launcher_principal
+}

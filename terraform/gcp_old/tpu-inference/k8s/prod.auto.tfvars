@@ -11,6 +11,12 @@ namespace = "buildkite"
 # it and never owns its value.
 agent_token_secret_id = "vllm_buildkite_agent_token"
 
+# The Test Engine token, in the suite's own project rather than this one. Also
+# not created here: the bare-metal agents read the same secret, and the results
+# of a kube run and a bare-metal run should land in one suite.
+analytics_token_secret_project = "cloud-tpu-inference-test"
+analytics_token_secret_id      = "tpu_commons_buildkite_analytics_token"
+
 # us-central1 to sit with the rest of the CI control plane: the monitoring VM,
 # the cache buckets, and the Artifact Registry these nodes pull from. The
 # manager holds no TPUs, so it is not tied to a reservation's zone.
@@ -22,6 +28,9 @@ manager_master_ipv4_cidr_block = "172.16.0.0/28"
 # asia-south1 and is not listed: nothing in this lane pulls from it, and a
 # repository absent here is simply unreadable.
 image_repositories = [
+  # This fleet's own images - the launcher - as opposed to the CI images below,
+  # which are built from the tpu-inference repo and named by a step.
+  { location = "us-central1", repository = "tpu-ci" },
   { location = "us-central1", repository = "tpu-inference" },
   { location = "us-central1", repository = "tpu-inference-ci" },
   { location = "us-central1", repository = "vllm-torchtpu" },
@@ -40,6 +49,32 @@ buildkite_queue = "kube"
 
 auth_plugin_image       = "gcr.io/google.com/cloudsdktool/google-cloud-cli:584.0.0"
 auth_plugin_source_path = "/usr/lib/google-cloud-sdk/bin/gke-gcloud-auth-plugin"
+
+# Built by kueue/launcher/cloudbuild.yaml from the Cloud CLI image the auth
+# plugin is copied out of, at the same version. Still a variable of its own:
+# there that image is a source of one static binary for a distroless container,
+# here it is the whole runtime a pod boots into, and the two move for different
+# reasons.
+#
+# The suffix after the CLI version is the Dockerfile revision, bumped when the
+# Dockerfile changes and the base image does not, so a tag names one set of
+# bytes.
+launcher_image = "us-central1-docker.pkg.dev/cloud-ullm-inference-ci-cd/tpu-ci/launcher:584.0.0-1"
+
+# A test may hold chips for three hours and a step may take eight in total,
+# queueing included; the launcher waits for admission for the difference. Both
+# are the bare-metal timeouts, so a step that moves here does not quietly get a
+# different budget.
+tpu_test_max_seconds  = 10800
+tpu_total_max_seconds = 28800
+
+# Every CI image this fleet runs is built into the manager project's Artifact
+# Registry, and a step names its own tag, so the project is the boundary rather
+# than the repository. Trailing slash required: without it the prefix would also
+# match a longer repository name.
+allowed_image_repos = [
+  "us-central1-docker.pkg.dev/cloud-ullm-inference-ci-cd/",
+]
 
 # A cluster is its project and its region; everything it is called is derived
 # from those two. The cluster pins no zones; the reservation's zone (us-east5-a)

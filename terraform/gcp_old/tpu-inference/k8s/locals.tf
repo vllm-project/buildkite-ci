@@ -14,6 +14,15 @@ locals {
     "/subject/ns/kueue-system/sa/kueue-controller-manager",
   ])
 
+  # The launcher's service account on the manager cluster, as IAM sees it. The
+  # older syntax, matching the rest of this fleet's namespaced grants; it names
+  # the same principal as the Kueue controller's above.
+  #
+  # The account name is fixed by kueue/templates/launcher.yaml.tpl, which is
+  # rendered rather than declared here, and the namespace is shared with
+  # Terraform for exactly this reason - see var.namespace.
+  launcher_principal = "serviceAccount:${var.project_id}.svc.id.goog[${var.namespace}/tpu-launcher]"
+
   # Worker clusters keyed by the pair that identifies one. The tfvars is a list
   # so that nothing has to be invented to name a cluster, but for_each needs a
   # key, and a positional index would renumber - and so destroy and rebuild -

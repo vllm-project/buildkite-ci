@@ -24,6 +24,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -43,6 +44,8 @@ UPSTREAM_MANIFESTS = {
     "kueue": "https://github.com/kubernetes-sigs/kueue/releases/download/v{version}/manifests.yaml",
     "jobset": "https://github.com/kubernetes-sigs/jobset/releases/download/v{version}/manifests.yaml",
 }
+
+AGENT_STACK_CHART = "oci://ghcr.io/buildkite/helm/agent-stack-k8s"
 
 
 def upstream(name: str, index: dict) -> str:
@@ -115,6 +118,78 @@ class Apply:
 
 
 @dataclass(frozen=True)
+class Chart:
+    """An upstream Helm chart, rendered and then treated as any other manifest.
+
+    helm is a renderer here and nothing else. There is no release, no history
+    and no in-cluster Helm state, so `helm template` output goes through the
+    same server-side apply as everything else and `kubectl diff` still previews
+    it. That keeps one way of applying things and one way of previewing them,
+    which is what the Kueue and JobSet releases already do - the only difference
+    is that a chart needs rendering before it can be fetched by path.
+
+    Not rendered at generate time into the committed tree, tempting as that is
+    for reviewability: the output would then depend on the helm binary that
+    happened to render it, and a colleague on another helm version would fail
+    the drift check having changed nothing. The values are committed instead,
+    which is the part we actually write.
+    """
+
+    what: str
+    # The release name, which is not cosmetic: the chart builds every object's
+    # name from it, so changing it renames the Deployment rather than updating
+    # it. It is the chart's own name because that is what upstream's install
+    # instructions use, and the names in `kubectl get` should match theirs.
+    release: str
+    chart: str
+    version: str
+    namespace: str
+    values: Path
+    field_manager: str = FIELD_MANAGER
+
+    @contextmanager
+    def _rendered(self):
+        """The chart as a file on disk, for the length of one step."""
+        with tempfile.TemporaryDirectory() as tmp:
+            # Fetched and rendered as two commands rather than one. helm prints
+            # what it pulled from an OCI registry on stdout, in the middle of
+            # the YAML, and kubectl reads that as a document with no kind; this
+            # way the notice belongs to the fetch and only the render is parsed.
+            self._helm("pull", self.chart, "--version", self.version,
+                       "--destination", tmp)
+            [archive] = Path(tmp).glob("*.tgz")
+
+            out = Path(tmp) / "rendered.yaml"
+            out.write_text(self._helm(
+                "template", self.release, str(archive),
+                "--namespace", self.namespace, "--values", str(self.values),
+            ))
+            yield out
+
+    @staticmethod
+    def _helm(*args: str) -> str:
+        proc = subprocess.run(["helm", *args], capture_output=True, text=True)
+        if proc.returncode:
+            raise SystemExit(f"failed: {shlex.join(('helm',) + args)}\n{proc.stderr}")
+        return proc.stdout
+
+    def run(self) -> None:
+        with self._rendered() as path:
+            run_command("kubectl", "apply", *ssa_flags(self.field_manager),
+                        "-f", str(path))
+
+    def diff(self) -> bool:
+        with self._rendered() as path:
+            cmd = ["kubectl", "diff", *ssa_flags(self.field_manager),
+                   "-f", str(path)]
+            if subprocess.run(cmd).returncode > 1:
+                print("  (could not diff the above; nothing installed yet, "
+                      "or the cluster rejected it)", file=sys.stderr)
+                return False
+        return True
+
+
+@dataclass(frozen=True)
 class Settle:
     """Wait for the controllers the applies before it installed."""
 
@@ -142,7 +217,7 @@ class Settle:
         return True
 
 
-def plan(cluster: dict, index: dict) -> list[Apply | Settle]:
+def plan(cluster: dict, index: dict) -> list[Apply | Chart | Settle]:
     """The install order, written once.
 
     The preview walks this same list, in this same order, which is the point of
@@ -153,7 +228,7 @@ def plan(cluster: dict, index: dict) -> list[Apply | Settle]:
     Deployment previewed clean.
     """
     base = DEFAULT_OUT / cluster["dir"]
-    steps: list[Apply | Settle] = [
+    steps: list[Apply | Chart | Settle] = [
         # JobSet first: Kueue only enables its jobset integration for a CRD that
         # exists when the controller starts, and the rollout below is what makes
         # that true on a fresh cluster.
@@ -181,6 +256,20 @@ def plan(cluster: dict, index: dict) -> list[Apply | Settle]:
     # applied to it.
     if (base / "workload").is_dir():
         steps.append(Apply("workload identity, secrets and caches", base / "workload"))
+
+    # Last, and manager only. The controller looks its agent token up by name at
+    # startup, so it wants the Secret that workload/ creates to be there
+    # already; started first it would crash-loop until the SecretSync caught up.
+    values = base / "charts" / "agent-stack-k8s.yaml"
+    if values.is_file():
+        steps.append(Chart(
+            "Buildkite controller",
+            release="agent-stack-k8s",
+            chart=AGENT_STACK_CHART,
+            version=index["agent_stack_version"],
+            namespace=index["namespace"],
+            values=values,
+        ))
 
     return steps
 
@@ -283,7 +372,7 @@ def main() -> int:
     # output it was meant to introduce.
     sys.stdout.reconfigure(line_buffering=True)
 
-    for tool in ("kubectl", "gcloud"):
+    for tool in ("kubectl", "gcloud", "helm"):
         if shutil.which(tool) is None:
             raise SystemExit(f"{tool} is not on PATH")
 
@@ -297,6 +386,7 @@ def main() -> int:
         # queues exist before a worker starts reporting to them.
         clusters = index["clusters"]
         print(f"Kueue v{index['kueue_version']}, JobSet v{index['jobset_version']}, "
+              f"agent-stack-k8s v{index['agent_stack_version']}, "
               f"{len(clusters)} cluster(s).")
 
         if args.mode != "apply":

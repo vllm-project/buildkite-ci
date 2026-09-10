@@ -114,7 +114,7 @@ variable "agent_token_secret_id" {
   EOT
 }
 
-# The four variables below are read by scripts/generate_manifests.py, not by
+# The six variables below are read by scripts/generate_manifests.py, not by
 # any resource here. They live in the same tfvars so that the cluster and what
 # runs on it are described in one place and change in one review, and so that
 # `terraform validate` type-checks them.
@@ -137,6 +137,23 @@ variable "auth_plugin_image" {
 variable "auth_plugin_source_path" {
   type        = string
   description = "Path to the credential plugin inside auth_plugin_image."
+}
+
+variable "agent_stack_version" {
+  type        = string
+  description = "agent-stack-k8s chart to install, without the leading v. Rendered with `helm template` at deploy time and applied like any other manifest; a chart version is immutable, so pinning one pins the bytes."
+}
+
+variable "buildkite_queue" {
+  type        = string
+  description = <<-EOT
+    Buildkite queue the controller claims jobs from.
+
+    One queue for the whole fleet, not one per TPU shape. A step names a
+    profile and the launcher submits the real workload to Kueue, so the shape
+    is chosen inside the cluster; a new shape is a regenerated profile
+    registry, not another queue and another agent to run it.
+  EOT
 }
 
 variable "worker_clusters" {

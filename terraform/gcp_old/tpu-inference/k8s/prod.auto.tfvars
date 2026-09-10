@@ -29,8 +29,14 @@ image_repositories = [
   { location = "us-central1", repository = "vllm-on-tpu-docker-container" },
 ]
 
-kueue_version  = "0.19.0"
-jobset_version = "0.12.0"
+kueue_version       = "0.19.0"
+jobset_version      = "0.12.0"
+agent_stack_version = "0.49.0"
+
+# A queue of its own rather than one of the names the bare-metal agents already
+# answer to, so the two fleets can run side by side and a pipeline moves over one
+# step at a time.
+buildkite_queue = "kube"
 
 auth_plugin_image       = "gcr.io/google.com/cloudsdktool/google-cloud-cli:584.0.0"
 auth_plugin_source_path = "/usr/lib/google-cloud-sdk/bin/gke-gcloud-auth-plugin"

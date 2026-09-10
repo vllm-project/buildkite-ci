@@ -37,6 +37,14 @@ DEFAULT_OUT = ROOT / "kueue" / "generated"
 # two have to agree, and one of them has to be the source. variables.tf carries
 # the reasoning for there being only the one namespace.
 
+# What the SecretSync calls the Secret it writes, and what the agent-stack-k8s
+# chart is told to read. Here rather than in either template because it is the
+# join between them: the controller looks the Secret up by name, so a rename on
+# one side and not the other leaves it crash-looping on a Secret that is not
+# there. Nothing outside this fleet refers to it, so the value itself is
+# arbitrary.
+AGENT_TOKEN_SECRET_NAME = "buildkite-agent-token"
+
 
 # hcl2 defaults to output you can write back out as HCL, which is not what we
 # want to read: a string keeps the quotes it was written with, so
@@ -255,6 +263,7 @@ def generate(tfvars: dict, out_dir: Path) -> dict:
             "secret_sync",
             NAMESPACE=namespace,
             PROJECT_ID=project,
+            SECRET_NAME=AGENT_TOKEN_SECRET_NAME,
             AGENT_TOKEN_SECRET_ID=tfvars["agent_token_secret_id"],
         ),
     )
@@ -300,9 +309,25 @@ def generate(tfvars: dict, out_dir: Path) -> dict:
         ),
     )
 
+    # Under charts/ rather than beside the manifests, because it is not one.
+    # deploy_manifests.py applies system/, queues/ and workload/; this is an
+    # input to a helm render, and applying it would be an error.
+    write(
+        base / "charts" / "agent-stack-k8s.yaml",
+        render(
+            "agent_stack_values",
+            AGENT_TOKEN_SECRET_NAME=AGENT_TOKEN_SECRET_NAME,
+            BUILDKITE_QUEUE=tfvars["buildkite_queue"],
+        ),
+    )
+
     return {
         "kueue_version": tfvars["kueue_version"],
         "jobset_version": tfvars["jobset_version"],
+        "agent_stack_version": tfvars["agent_stack_version"],
+        # For the chart render, which is the one thing deployed by flag rather
+        # than by manifest and so cannot read its namespace off the object.
+        "namespace": namespace,
         "clusters": clusters,
     }
 

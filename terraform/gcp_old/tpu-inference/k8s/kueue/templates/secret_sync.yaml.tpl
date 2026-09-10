@@ -46,7 +46,7 @@ metadata:
 apiVersion: secrets-store.csi.x-k8s.io/v1
 kind: SecretProviderClass
 metadata:
-  name: buildkite-agent-token
+  name: ${SECRET_NAME}
   namespace: ${NAMESPACE}
 spec:
   provider: gke
@@ -57,7 +57,8 @@ spec:
 ---
 # The Secret itself, which takes this object's own name. The key is not ours to
 # choose - agent-stack-k8s reads BUILDKITE_AGENT_TOKEN out of whatever Secret it
-# is pointed at - but the name is, and PR 6 points the chart here.
+# is pointed at - but the name is, and it comes from the generator rather than
+# from here, because the chart's values have to name the same Secret.
 #
 # Rotation updates this object in place - same name, new value, within about
 # five minutes of a new Secret Manager version. There is no watch, only a poll,
@@ -71,11 +72,11 @@ spec:
 apiVersion: secret-sync.gke.io/v1
 kind: SecretSync
 metadata:
-  name: buildkite-agent-token
+  name: ${SECRET_NAME}
   namespace: ${NAMESPACE}
 spec:
   serviceAccountName: secret-sync
-  secretProviderClassName: buildkite-agent-token
+  secretProviderClassName: ${SECRET_NAME}
   secretObject:
     type: Opaque
     data:

@@ -1,0 +1,3 @@
+# For generate_manifests.py, which reads prod.auto.tfvars so that the queues
+# and the node pools cannot describe different reservations.
+python-hcl2==8.1.2

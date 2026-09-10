@@ -4,37 +4,39 @@ locals {
     component  = "tpu-ci"
   })
 
-  # The slice one VM of a TPU machine type covers, for the generations this
-  # fleet has chips in. v6e topologies are 2D, v7x 3D. The trailing count is
-  # chips per VM, unlike the Buildkite queue names, where tpu7x-8 counts
-  # TensorCores and is the four chips of a tpu7x-standard-4t.
-  single_host_topology = {
-    "ct6e-standard-1t"  = "1x1"
-    "ct6e-standard-4t"  = "2x2"
-    "ct6e-standard-8t"  = "2x4"
-    "tpu7x-standard-1t" = "1x1x1"
-    "tpu7x-standard-4t" = "2x2x1"
-  }
-
-  # Every cluster's pools in one map, since one resource creates them all. A
-  # name used by two clusters collides here rather than silently losing a pool.
+  # Every cluster's pools in one map, since one resource creates them all.
+  #
+  # A pool is named for its shape - the machine type and the topology asked of
+  # that machine, e.g. ct6e-standard-8t-2x4 - and the name is built here rather
+  # than given in the tfvars, so it cannot describe hardware the pool does not
+  # have. The map is keyed by cluster as well, because the name only has to be
+  # unique inside its own cluster and two regions running the same shape should
+  # name it the same thing.
   tpu_node_pools = {
     for pool in flatten([
       for worker_name, worker in var.worker_clusters : [
-        for pool_name, pool in worker.tpu_node_pools : merge(pool, {
-          name   = pool_name
-          worker = worker_name
+        for pool in worker.tpu_node_pools : [
+          # dims is the topology's dimensions padded to three with 1s, so that the
+          # product below is one expression: Terraform has no product(), and v7x
+          # topologies are 3D where v6e's are 2D.
+          for dims in [concat([for d in split("x", pool.topology) : parseint(d, 10)], [1, 1])] :
+          merge(pool, {
+            name   = "${pool.machine_type}-${pool.topology}"
+            worker = worker_name
 
-          # One VM covering the whole slice is the ordinary case, and needs no
-          # placement policy. Anything wider is a slice GKE has to place as a
-          # unit across several VMs, which it only does from one.
-          is_multi_host = pool.topology != local.single_host_topology[pool.machine_type]
-
-          cluster_project  = worker.project
-          cluster_location = worker.location
-        })
+            # One VM covering the whole slice is the ordinary case, and needs no
+            # placement policy. Anything wider is a slice GKE has to place as a
+            # unit across several VMs, which it only does from one. The machine
+            # type's suffix is chips per VM, unlike the Buildkite queue names,
+            # where tpu7x-8 counts TensorCores and is a four-chip
+            # tpu7x-standard-4t.
+            is_multi_host = dims[0] * dims[1] * dims[2] > parseint(
+              trimsuffix(reverse(split("-", pool.machine_type))[0], "t"), 10
+            )
+          })
+        ]
       ]
-    ]) : pool.name => pool
+    ]) : "${pool.worker}/${pool.name}" => pool
   }
 
   # Keep this list to what a node needs to boot, log and report metrics. Every

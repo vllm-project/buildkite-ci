@@ -174,11 +174,13 @@ def plan(cluster: dict, index: dict) -> list[Apply | Settle]:
         Apply("queues", base / "queues"),
     ]
 
-    # Workers only. The manager runs no TPU pod, so it has neither a workload
-    # service account nor a cache to mount, and generate_manifests.py writes it
-    # no workload directory to apply.
+    # What the namespace needs beyond its queues, which is not the same on both
+    # sides: the manager syncs the agent token, a worker gets the identity its
+    # TPU pods run as and the caches they mount. Conditional rather than assumed,
+    # because a cluster that needs neither should not have an empty directory
+    # applied to it.
     if (base / "workload").is_dir():
-        steps.append(Apply("workload service account and caches", base / "workload"))
+        steps.append(Apply("workload identity, secrets and caches", base / "workload"))
 
     return steps
 

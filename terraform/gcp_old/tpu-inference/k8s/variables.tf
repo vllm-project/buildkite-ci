@@ -72,19 +72,16 @@ variable "worker_clusters" {
     system_min_nodes    = optional(number, 1)
     system_max_nodes    = optional(number, 3)
 
-    # One per TPU shape this cluster can run, keyed by node pool name. Names
-    # have to be unique across all clusters, not just within one, because the
-    # pools are flattened into a single map to create them.
-    #
-    # Named <generation>-<chips per host>-<topology>, e.g. v6e-8t-2x4. The
-    # middle part is the machine type's suffix, and it is what makes the name
-    # unique: a topology does not determine the machine type. 2x4 is eight
-    # chips either as one ct6e-standard-8t or as two ct6e-standard-4t, and
-    # those differ in pod count, chips per pod and JobSet parallelism.
-    tpu_node_pools = optional(map(object({
-      # The machine type is the VM, the topology the slice asked of it. Matching
-      # shapes mean one VM holds the whole slice; a larger topology means one
-      # slice across several, which GKE only builds from a placement policy.
+    # One per TPU shape this cluster can run. A list rather than a map, because
+    # the node pool's name is its shape - <machine type>-<topology>, e.g.
+    # ct6e-standard-8t-2x4 - and locals.tf builds it from the two fields below
+    # rather than taking it from here, so it cannot name hardware the pool does
+    # not have.
+    tpu_node_pools = optional(list(object({
+      # The machine type is the VM, the topology the slice asked of it. Both are
+      # needed because a topology does not imply a machine type: 2x4 is eight
+      # chips either as one ct6e-standard-8t or as two ct6e-standard-4t, and
+      # those differ in pod count, chips per pod and JobSet parallelism.
       machine_type = string
       topology     = string
 
@@ -99,7 +96,7 @@ variable "worker_clusters" {
       # Above this pool's share of the reservation, so the shapes compete for
       # free chips; the reservation running out is what stops a scale-up.
       max_nodes = number
-    })), {})
+    })), [])
   }))
   description = "Worker clusters keyed by a short name. location is a region; the cluster pins no zones, because only a TPU node cares which zone it is in and its own node pool pins it there."
   default     = {}
@@ -110,6 +107,18 @@ variable "worker_clusters" {
       length(regexall("^[a-z0-9]+-[a-z0-9]+[0-9]$", w.location)) > 0
     ])
     error_message = "worker_clusters[*].location must be a region, not a zone: a zone here silently gets a zonal control plane, and changing it later rebuilds the cluster."
+  }
+
+  # The pool name is derived, so a repeated shape does not collide loudly the
+  # way a repeated map key would - it silently drops one of the two pools.
+  validation {
+    condition = alltrue([
+      for w in values(var.worker_clusters) :
+      length(distinct([
+        for p in w.tpu_node_pools : "${p.machine_type}-${p.topology}"
+      ])) == length(w.tpu_node_pools)
+    ])
+    error_message = "Two tpu_node_pools in one worker cluster have the same machine type and topology. The node pool is named for that pair, so the second would overwrite the first."
   }
 }
 

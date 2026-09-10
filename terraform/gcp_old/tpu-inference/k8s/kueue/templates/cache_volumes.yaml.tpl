@@ -1,0 +1,176 @@
+---
+# The caches, as claims a pod can name without knowing where they live.
+#
+# Static PersistentVolumes rather than inline CSI volumes in the workload
+# manifest. The bucket is regional - a cache 10,000 km away costs 502ms per miss
+# against 36ms in-region - so its name differs per cluster, and putting it in
+# the workload would mean every manifest, pipeline and step carrying a bucket
+# name it has no business knowing. Here the claim names are identical in every
+# region and the binding is infrastructure, which also survives MultiKueue
+# placing a job somewhere other than where it was submitted: the claim resolves
+# at mount time, in whichever cluster the pod actually landed in.
+#
+# Created here rather than by the workload because MultiKueue copies only the
+# Job. A claim created where the launcher runs would not exist where the pod
+# does. These are static and shared, and gcsfuse serves ReadWriteMany, so every
+# pod mounts the same claim at once.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: jax-cache
+spec:
+  accessModes:
+    - ReadWriteMany
+  # Ignored by the driver - a bucket has no size - but the API requires it and
+  # the claim below has to ask for the same number.
+  capacity:
+    storage: 1Gi
+  storageClassName: ""
+  persistentVolumeReclaimPolicy: Retain
+  claimRef:
+    namespace: ${NAMESPACE}
+    name: jax-cache
+  mountOptions:
+    - implicit-dirs
+    # Scoped to this cache, not the whole bucket. The bucket is per purpose but
+    # will hold more than one kind of compilation cache, so this one lives under
+    # its own prefix and the mount says so - otherwise the metadata prefetch
+    # walks every other kind at mount time to reach this one. A second kind gets
+    # its own PersistentVolume with its own only-dir.
+    - only-dir=jax_cache
+    # Thousands of small content-addressed files, read far more often than
+    # written. Never expire metadata: every access stats the object, the default
+    # TTL is 60s, and re-stating over the network is what a compile-heavy step
+    # would otherwise spend its time on. Safe to pin because an entry's name
+    # encodes its contents, so a name never changes meaning.
+    - metadata-cache:ttl-secs:-1
+    - metadata-cache:stat-cache-max-size-mb:-1
+    - metadata-cache:type-cache-max-size-mb:-1
+    - file-system:kernel-list-cache-ttl-secs:-1
+    # A compilation cache is mostly misses, and at the 5s default every "does
+    # this exist" that comes back no is another round trip. Bounded rather than
+    # infinite because this mount is written during a run.
+    - metadata-cache:negative-ttl-secs:60
+    # 1MiB, not the 128MiB the model mount uses: reading ahead of a 4KiB cache
+    # entry buys nothing and costs bandwidth on every lookup. Parallel downloads
+    # are off for the same reason - they exist for reads over a gigabyte.
+    - read_ahead_kb=1024
+    - file-cache:enable-parallel-downloads:false
+    - write:enable-streaming-writes:true
+  csi:
+    driver: gcsfuse.csi.storage.gke.io
+    volumeHandle: ${CACHE_BUCKET}
+    volumeAttributes:
+      # Load this prefix's metadata in one batch at mount instead of a round
+      # trip per lookup. Requires the unbounded caches above.
+      gcsfuseMetadataPrefetchOnMount: "true"
+      # Redundant here: every pod uses the same service account against the same
+      # bucket, and the check costs IAM and STS calls on the startup path.
+      skipCSIBucketAccessCheck: "true"
+      # 8Gi against the model mount's 65Gi. Compilation entries are thousands of
+      # small files and a run reads a fraction of a namespace that is only ~34GB
+      # whole, so the rest of the node's cache is worth more to the models.
+      #
+      # Explicit rather than -1: this is the threshold gcsfuse evicts against,
+      # and with -1 it fills the volume and then starts failing writes.
+      #
+      # One figure, not one per machine type: a PersistentVolume is a single
+      # object per cluster and every profile's pods bind the same claim, so it
+      # has to hold on the smallest shape we run. Sized for ct6e-standard-1t's
+      # 176 GB, and conservative above it.
+      fileCacheCapacity: "8Gi"
+      # Defaults to false, which sends random reads past the cache to GCS.
+      fileCacheForRangeRead: "true"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jax-cache
+  namespace: ${NAMESPACE}
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: ""
+  volumeName: jax-cache
+---
+# Model weights: few large files read sequentially, the opposite shape to the
+# compilation cache, so tuned the opposite way. Its own bucket rather than a
+# second prefix of the one above, because the driver keys a volume by bucket
+# name and two PersistentVolumes over one bucket become a single mount.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: hf-cache
+spec:
+  accessModes:
+    - ReadWriteMany
+  # Ignored, as above, and worth repeating here because this mount holds
+  # multi-gigabyte checkpoints and 1Gi reads like a limit. It is not one: the
+  # driver never enforces capacity on a bucket. What does bound anything is
+  # fileCacheCapacity below, which sizes the on-node cache.
+  capacity:
+    storage: 1Gi
+  storageClassName: ""
+  persistentVolumeReclaimPolicy: Retain
+  claimRef:
+    namespace: ${NAMESPACE}
+    name: hf-cache
+  mountOptions:
+    - implicit-dirs
+    - metadata-cache:ttl-secs:-1
+    - metadata-cache:stat-cache-max-size-mb:-1
+    - metadata-cache:type-cache-max-size-mb:-1
+    - file-system:kernel-list-cache-ttl-secs:-1
+    # An hour, against the compilation cache's minute. Hugging Face probes
+    # several optional files per model - adapter_config.json and friends - that
+    # legitimately do not exist, and a model that is absent stays absent until
+    # something downloads it, which writes through this same mount.
+    - metadata-cache:negative-ttl-secs:3600
+    # 128MiB, GKE's own serving-profile value. Large sequential reads want each
+    # round trip to carry as much as possible.
+    - read_ahead_kb=131072
+    - file-cache:enable-parallel-downloads:true
+    - file-cache:parallel-downloads-per-file:8
+    - file-cache:download-chunk-size-mb:64
+    - write:enable-streaming-writes:true
+  csi:
+    driver: gcsfuse.csi.storage.gke.io
+    volumeHandle: ${MODELS_BUCKET}
+    volumeAttributes:
+      gcsfuseMetadataPrefetchOnMount: "true"
+      skipCSIBucketAccessCheck: "true"
+      # 65Gi. fileCacheForRangeRead below pulls a whole object into the cache on
+      # a partial read, and gcsfuse will not cache an object that does not fit
+      # the remaining capacity - so at 20Gi the larger checkpoints, read a few
+      # layers at a time, were refetched on every load and evicted the small
+      # models that would have fit. That was 84.6m of a 111.8m step; at 56Gi the
+      # same work took 23.8m and the step reached parity with bare metal. 73Gi
+      # was no better than 56Gi, so the working set already fits and the
+      # difference is ~25 GiB of node returned to the tests.
+      #
+      # The pod must back this with a gke-gcsfuse-cache volume at least this
+      # large, or the sidecar falls back to 5GiB of ephemeral storage and the
+      # capacity is nominal. The launcher sizes that volume per machine type in
+      # PR 7; until then a pod mounting these claims must size it itself.
+      fileCacheCapacity: "65Gi"
+      # safetensors are memory-mapped, which is nothing but random reads. With
+      # this false a 2.88 GiB checkpoint page-faulted over the network until the
+      # server timed out.
+      fileCacheForRangeRead: "true"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hf-cache
+  namespace: ${NAMESPACE}
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: ""
+  volumeName: hf-cache

@@ -13,18 +13,18 @@
 # images work without egress, but Kueue and JobSet are published on
 # registry.k8s.io and time out. Per region, because a Cloud Router is regional.
 resource "google_compute_router" "worker" {
-  for_each = var.worker_clusters
+  for_each = local.workers
 
-  name    = "${var.name_prefix}-wkr-${each.key}-router"
+  name    = "${var.name_prefix}-wkr-${each.value.short_name}-router"
   project = each.value.project
   region  = each.value.location
   network = each.value.network
 }
 
 resource "google_compute_router_nat" "worker" {
-  for_each = var.worker_clusters
+  for_each = local.workers
 
-  name                               = "${var.name_prefix}-wkr-${each.key}-nat"
+  name                               = "${var.name_prefix}-wkr-${each.value.short_name}-nat"
   project                            = each.value.project
   region                             = each.value.location
   router                             = google_compute_router.worker[each.key].name
@@ -33,9 +33,16 @@ resource "google_compute_router_nat" "worker" {
 }
 
 resource "google_container_cluster" "worker" {
-  for_each = var.worker_clusters
+  for_each = local.workers
 
-  name     = "${var.name_prefix}-${each.key}"
+  # The region alone, because a cluster name is scoped to its project. It is
+  # also the Fleet membership ID, though, and every worker joins the manager's
+  # fleet whatever project it runs in - so two clusters in one region in
+  # different projects would ask for one membership and the second apply would
+  # be refused. Give one of them an explicit short name when that day comes:
+  # added as an optional field it renames nothing that already exists, which is
+  # why there is no such field yet.
+  name     = "${var.name_prefix}-${each.value.short_name}"
   project  = each.value.project
   location = each.value.location
 
@@ -65,6 +72,16 @@ resource "google_container_cluster" "worker" {
     workload_pool = "${each.value.project}.svc.id.goog"
   }
 
+  # How the cache buckets reach a pod. The driver is off by default and cannot
+  # be installed by applying a manifest; it is a GKE addon, and a
+  # PersistentVolume naming gcsfuse.csi.storage.gke.io just stays Pending
+  # without it. Only on workers, because only the TPU pods mount the caches.
+  addons_config {
+    gcs_fuse_csi_driver_config {
+      enabled = true
+    }
+  }
+
   # MultiKueue reaches workers through the Connect Gateway, which resolves a
   # Fleet membership rather than a kubeconfig. Registering here is enough: GKE
   # creates the membership itself, in the cluster's region, and ties its
@@ -84,7 +101,7 @@ resource "google_container_cluster" "worker" {
 
   resource_labels = merge(local.common_labels, {
     role   = "worker"
-    worker = each.key
+    worker = each.value.short_name
   })
 
   lifecycle {
@@ -102,7 +119,7 @@ resource "google_container_cluster" "worker" {
 # per-cluster half of anything MultiKueue installs. TPU nodes carry a NoSchedule
 # taint, so without this pool a worker has nowhere to run system pods.
 resource "google_container_node_pool" "worker_system" {
-  for_each = var.worker_clusters
+  for_each = local.workers
 
   name     = "system"
   project  = each.value.project
@@ -139,7 +156,7 @@ resource "google_container_node_pool" "worker_system" {
 
     labels = {
       "tpu-ci.google.com/role"   = "system"
-      "tpu-ci.google.com/worker" = each.key
+      "tpu-ci.google.com/worker" = each.value.short_name
     }
 
     metadata = {
@@ -192,7 +209,7 @@ resource "google_container_node_pool" "worker_tpu" {
     }
 
     labels = {
-      "tpu-ci.google.com/worker"  = each.value.worker
+      "tpu-ci.google.com/worker"  = each.value.short_name
       "tpu-ci.google.com/profile" = each.value.name
     }
 
@@ -246,7 +263,7 @@ resource "google_container_node_pool" "worker_tpu" {
 # manages, and destroy would revoke it.
 resource "google_project_iam_member" "gkehub_service_agent" {
   for_each = toset([
-    for name, w in var.worker_clusters : w.project if w.project != var.project_id
+    for w in var.worker_clusters : w.project if w.project != var.project_id
   ])
 
   project = each.value

@@ -20,6 +20,7 @@ step.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import shutil
 import sys
 from pathlib import Path
@@ -31,12 +32,10 @@ TFVARS = ROOT / "prod.auto.tfvars"
 TEMPLATES = ROOT / "kueue" / "templates"
 DEFAULT_OUT = ROOT / "kueue" / "generated"
 
-# The one namespace, on the manager and on every worker. The agent-stack-k8s
-# controller, the launcher pods it creates and the workloads those submit all
-# share it, because a LocalQueue is namespaced and a workload names its queue
-# from inside its own namespace. It exists on the workers too because MultiKueue
-# mirrors a workload into the namespace it came from.
-NAMESPACE = "buildkite"
+# The namespace is read from the tfvars rather than set here, because the cache
+# bucket IAM in cache.tf names the workload's service account by namespace: the
+# two have to agree, and one of them has to be the source. variables.tf carries
+# the reasoning for there being only the one namespace.
 
 
 # hcl2 defaults to output you can write back out as HCL, which is not what we
@@ -51,6 +50,25 @@ TFVARS_OPTIONS = hcl2.SerializationOptions(
 def load_tfvars(path: Path) -> dict:
     with path.open() as f:
         return hcl2.load(f, serialization_options=TFVARS_OPTIONS)
+
+
+def bucket_name(prefix: str, project: str, location: str, purpose: str) -> str:
+    """Where a worker's cache lives, derived rather than configured.
+
+    locals.tf derives it identically and creates the bucket; this writes the
+    same string into a PersistentVolume's volumeHandle. Two derivations of one
+    name can drift, and the failure is quiet - a volume pointing at a bucket
+    that was never created - so deploy_manifests.py checks that every bucket a
+    volume names exists before it applies anything. Change one side and the
+    other has to move with it.
+
+    The hash covers project and region, which is what identifies a cluster; the
+    purpose sits beside it in the clear, so a cluster's two buckets share a
+    suffix and read as a pair. The project is in the hash because a bucket name
+    is globally unique across the whole of GCP.
+    """
+    digest = hashlib.sha256(f"{project}/{location}".encode()).hexdigest()[:8]
+    return f"{prefix}-{purpose}-{digest}"
 
 
 def render(name: str, **values) -> str:
@@ -96,7 +114,7 @@ def shapes(worker: dict) -> dict[str, int]:
     }
 
 
-def queues(shapes: dict[str, int], checks: bool) -> str:
+def queues(shapes: dict[str, int], namespace: str, checks: bool) -> str:
     """A flavor per machine family, then a queue per shape sharing it.
 
     checks is what separates the manager from a worker: on the manager every
@@ -113,7 +131,7 @@ def queues(shapes: dict[str, int], checks: bool) -> str:
                 "queue_group",
                 QUEUE_NAME=name,
                 ACCELERATOR=cohort(name),
-                NAMESPACE=NAMESPACE,
+                NAMESPACE=namespace,
                 NOMINAL_QUOTA=chips,
                 ADMISSION_CHECKS=(
                     "\n  admissionChecksStrategy:\n"
@@ -147,7 +165,15 @@ def write(path: Path, text: str) -> None:
 def generate(tfvars: dict, out_dir: Path) -> dict:
     project = tfvars["project_id"]
     prefix = tfvars["name_prefix"]
-    workers = tfvars.get("worker_clusters", {})
+    namespace = tfvars["namespace"]
+
+    # Sorted by the pair that identifies a cluster, so the render is stable
+    # whatever order the tfvars lists them in - the tree is committed, and a
+    # reordering that changed no configuration would still show up as a diff.
+    workers = sorted(
+        tfvars.get("worker_clusters", []),
+        key=lambda w: (w["project"], w["location"]),
+    )
 
     manager_name = f"{prefix}-manager"
     manager_dir = "manager"
@@ -166,10 +192,12 @@ def generate(tfvars: dict, out_dir: Path) -> dict:
         }
     ]
 
-    for worker_key in sorted(workers):
-        worker = workers[worker_key]
-        cluster_name = f"{prefix}-{worker_key}"
-        worker_dir = f"worker-{worker_key}"
+    for worker in workers:
+        # Nested rather than one flattened name, so the tree groups by project
+        # the way the fleet does and a region is a leaf under it. Both parts are
+        # needed: two projects may each run a us-east5.
+        worker_dir = f"workers/{worker['project']}/{worker['location']}"
+        cluster_name = f"{prefix}-{worker['location']}"
         clusters.append(
             {
                 "dir": worker_dir,
@@ -188,11 +216,32 @@ def generate(tfvars: dict, out_dir: Path) -> dict:
 
         base = out_dir / worker_dir
         write(base / "system" / "10-kueue-config.yaml", kueue_config("worker"))
-        write(base / "queues" / "00-namespace.yaml", render("namespace", NAMESPACE=NAMESPACE))
-        write(base / "queues" / "10-queues.yaml", queues(local, checks=False))
+        write(base / "queues" / "00-namespace.yaml", render("namespace", NAMESPACE=namespace))
+        write(base / "queues" / "10-queues.yaml", queues(local, namespace, checks=False))
         write(
             base / "queues" / "20-multikueue-rbac.yaml",
             render("multikueue_rbac_worker", PROJECT_ID=project),
+        )
+
+        # Workers only: the TPU pods are the only thing that mounts a cache, and
+        # a PersistentVolume naming the gcsfuse driver is not satisfiable on the
+        # manager, which does not have it enabled.
+        write(
+            base / "workload" / "00-service-account.yaml",
+            render("workload_sa", NAMESPACE=namespace, PROJECT_ID=worker["project"]),
+        )
+        write(
+            base / "workload" / "10-cache-volumes.yaml",
+            render(
+                "cache_volumes",
+                NAMESPACE=namespace,
+                CACHE_BUCKET=bucket_name(
+                    prefix, worker["project"], worker["location"], "cache"
+                ),
+                MODELS_BUCKET=bucket_name(
+                    prefix, worker["project"], worker["location"], "models"
+                ),
+            ),
         )
 
     base = out_dir / manager_dir
@@ -205,11 +254,12 @@ def generate(tfvars: dict, out_dir: Path) -> dict:
             AUTH_PLUGIN_SRC=tfvars["auth_plugin_source_path"],
         ),
     )
-    write(base / "queues" / "00-namespace.yaml", render("namespace", NAMESPACE=NAMESPACE))
+    write(base / "queues" / "00-namespace.yaml", render("namespace", NAMESPACE=namespace))
     write(
         base / "queues" / "10-queues.yaml",
         queues(
             {name: entry["chips"] for name, entry in fleet.items()},
+            namespace,
             checks=True,
         ),
     )

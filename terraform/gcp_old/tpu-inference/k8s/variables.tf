@@ -51,6 +51,48 @@ variable "enable_private_endpoint" {
   default     = false
 }
 
+variable "namespace" {
+  type        = string
+  description = <<-EOT
+    The one namespace, on the manager and on every worker.
+
+    The agent-stack-k8s controller, the launcher pods it creates and the
+    workloads those submit all share it, because a LocalQueue is namespaced and
+    a workload names its queue from inside its own namespace. It exists on the
+    workers too, because MultiKueue mirrors a workload into the namespace it
+    came from.
+
+    Here rather than only in generate_manifests.py because the cache bucket
+    grants name the workload's service account by namespace, so Terraform and
+    the generator have to agree on it. Required rather than defaulted for the
+    same reason: a default would be a second place the name is written.
+  EOT
+}
+
+variable "cache_lifecycle_age_days" {
+  type        = number
+  default     = 30
+  description = <<-EOT
+    Days before a compilation cache object is deleted.
+
+    Longer than the four days the bare-metal bucket uses, because the two are
+    not alike: this bucket is per region and shared by every shape, so an entry
+    is worth more and the whole namespace is only tens of gigabytes.
+  EOT
+}
+
+variable "models_lifecycle_age_days" {
+  type        = number
+  default     = 120
+  description = <<-EOT
+    Days before a cached model object is deleted.
+
+    Longer than the compilation cache, because the two are not alike. A model
+    is expensive to fetch and does not change; a compilation entry is cheap to
+    recreate and is invalidated by any compiler change.
+  EOT
+}
+
 variable "image_repositories" {
   type = list(object({
     location   = string
@@ -86,9 +128,15 @@ variable "auth_plugin_source_path" {
 }
 
 variable "worker_clusters" {
-  type = map(object({
-    project                = string
-    location               = string
+  type = list(object({
+    # What identifies a worker cluster. Every name it gets is derived from this
+    # pair and nothing else, so there is no label to invent and none to keep in
+    # step: locals.tf builds the project-scoped names from location alone, and
+    # the fleet-wide ones - the Terraform address, the generated directory, the
+    # MultiKueueCluster on the manager - from both.
+    project  = string
+    location = string
+
     network                = string
     subnetwork             = string
     master_ipv4_cidr_block = string
@@ -132,22 +180,33 @@ variable "worker_clusters" {
       nominal_nodes = number
     })), [])
   }))
-  description = "Worker clusters keyed by a short name. location is a region; the cluster pins no zones, because only a TPU node cares which zone it is in and its own node pool pins it there."
-  default     = {}
+  description = "Worker clusters. location is a region; the cluster pins no zones, because only a TPU node cares which zone it is in and its own node pool pins it there."
+  default     = []
 
   validation {
     condition = alltrue([
-      for name, w in var.worker_clusters :
+      for w in var.worker_clusters :
       length(regexall("^[a-z0-9]+-[a-z0-9]+[0-9]$", w.location)) > 0
     ])
     error_message = "worker_clusters[*].location must be a region, not a zone: a zone here silently gets a zonal control plane, and changing it later rebuilds the cluster."
+  }
+
+  # A list has no keys, so nothing here is unique by construction the way a map
+  # key would be. locals.tf keys every cluster on this pair, so a repeat does
+  # not fail - it drops one of the two clusters, silently. Two clusters in one
+  # region are fine; two in one region *and* one project are the same cluster.
+  validation {
+    condition = length(distinct([
+      for w in var.worker_clusters : "${w.project}/${w.location}"
+    ])) == length(var.worker_clusters)
+    error_message = "Two worker_clusters have the same project and location. A cluster is identified by that pair, so the second would overwrite the first."
   }
 
   # The pool name is derived, so a repeated shape does not collide loudly the
   # way a repeated map key would - it silently drops one of the two pools.
   validation {
     condition = alltrue([
-      for w in values(var.worker_clusters) :
+      for w in var.worker_clusters :
       length(distinct([
         for p in w.tpu_node_pools : "${p.machine_type}-${p.topology}"
       ])) == length(w.tpu_node_pools)

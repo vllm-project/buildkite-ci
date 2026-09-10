@@ -33,15 +33,15 @@ resource "google_artifact_registry_repository_iam_member" "manager_nodes" {
 # One per worker cluster rather than one shared account, so that revoking a
 # worker's access is deleting a principal and not editing a policy.
 resource "google_service_account" "worker_nodes" {
-  for_each = var.worker_clusters
+  for_each = local.workers
 
   project      = each.value.project
-  account_id   = "${var.name_prefix}-wkr-${each.key}"
-  display_name = "Worker GKE Node SA (${each.key})"
+  account_id   = "${var.name_prefix}-wkr-${each.value.short_name}"
+  display_name = "Worker GKE Node SA (${each.value.short_name})"
 }
 
 resource "google_project_iam_member" "worker_nodes" {
-  for_each = var.worker_clusters
+  for_each = local.workers
 
   project = each.value.project
   role    = "roles/container.defaultNodeServiceAccount"

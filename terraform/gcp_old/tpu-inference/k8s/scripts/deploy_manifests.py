@@ -153,7 +153,7 @@ def plan(cluster: dict, index: dict) -> list[Apply | Settle]:
     Deployment previewed clean.
     """
     base = DEFAULT_OUT / cluster["dir"]
-    return [
+    steps: list[Apply | Settle] = [
         # JobSet first: Kueue only enables its jobset integration for a CRD that
         # exists when the controller starts, and the rollout below is what makes
         # that true on a fresh cluster.
@@ -167,10 +167,20 @@ def plan(cluster: dict, index: dict) -> list[Apply | Settle]:
 
         Settle(),
 
-        # Last, because ClusterQueue and LocalQueue go through Kueue's
-        # validating webhook, which is the controller that just restarted.
+        # Before the workload directory, because ClusterQueue and LocalQueue go
+        # through Kueue's validating webhook - the controller that just
+        # restarted - and because the namespace everything below lives in is
+        # created here.
         Apply("queues", base / "queues"),
     ]
+
+    # Workers only. The manager runs no TPU pod, so it has neither a workload
+    # service account nor a cache to mount, and generate_manifests.py writes it
+    # no workload directory to apply.
+    if (base / "workload").is_dir():
+        steps.append(Apply("workload service account and caches", base / "workload"))
+
+    return steps
 
 
 def deploy_cluster(cluster: dict, index: dict, preview: bool) -> bool:
@@ -215,6 +225,42 @@ def verify_generated() -> dict:
     return index
 
 
+def verify_buckets() -> None:
+    """Every bucket a PersistentVolume names has to exist already.
+
+    generate_manifests.py derives the name and locals.tf derives it again to
+    create the bucket, so the two can drift - and Kubernetes will not notice. A
+    volume naming a bucket nobody created applies cleanly and keeps working
+    until a pod tries to mount it, which is somewhere else, later, and reads as
+    a broken pod rather than a broken name. Terraform runs before this script,
+    so by now the bucket either exists or the name is wrong.
+
+    Read by line rather than parsed: this tree is generated, so the spelling is
+    ours, and it saves the script a YAML dependency it otherwise does not need.
+    """
+    handles = sorted({
+        line.split(":", 1)[1].strip()
+        for path in DEFAULT_OUT.rglob("*.yaml")
+        for line in path.read_text().splitlines()
+        if line.strip().startswith("volumeHandle:")
+    })
+    missing = [
+        bucket for bucket in handles
+        if subprocess.run(
+            ["gcloud", "storage", "buckets", "describe", f"gs://{bucket}"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        ).returncode
+    ]
+    if missing:
+        raise SystemExit(
+            f"\nno such bucket: {', '.join(missing)}\n"
+            "A PersistentVolume names it, so either terraform has not been "
+            "applied yet, or locals.tf and generate_manifests.py no longer "
+            "derive the same name."
+        )
+    print(f"{len(handles)} cache bucket(s) exist.")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -244,6 +290,7 @@ def main() -> int:
         os.environ["KUBECONFIG"] = str(Path(kubeconfig_dir) / "config")
 
         index = verify_generated()
+        verify_buckets()
         # In the order the generator listed them: the manager first, so its
         # queues exist before a worker starts reporting to them.
         clusters = index["clusters"]

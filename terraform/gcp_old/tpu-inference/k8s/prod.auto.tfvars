@@ -2,6 +2,10 @@ project_id  = "cloud-ullm-inference-ci-cd"
 name_prefix = "tpu-ci"
 network     = "projects/cloud-ullm-inference-ci-cd/global/networks/default"
 
+# Read by both terraform and scripts/generate_manifests.py; see variables.tf for
+# why there is only the one.
+namespace = "buildkite"
+
 # us-central1 to sit with the rest of the CI control plane: the monitoring VM,
 # the cache buckets, and the Artifact Registry these nodes pull from. The
 # manager holds no TPUs, so it is not tied to a reservation's zone.
@@ -26,10 +30,11 @@ jobset_version = "0.12.0"
 auth_plugin_image       = "gcr.io/google.com/cloudsdktool/google-cloud-cli:584.0.0"
 auth_plugin_source_path = "/usr/lib/google-cloud-sdk/bin/gke-gcloud-auth-plugin"
 
-# Keyed by region. The cluster pins no zones; the reservation's zone
-# (us-east5-a) belongs to the TPU pools that draw on it.
-worker_clusters = {
-  us-east5 = {
+# A cluster is its project and its region; everything it is called is derived
+# from those two. The cluster pins no zones; the reservation's zone (us-east5-a)
+# belongs to the TPU pools that draw on it.
+worker_clusters = [
+  {
     project                = "cloud-ullm-inference-ci-cd"
     location               = "us-east5"
     network                = "projects/cloud-ullm-inference-ci-cd/global/networks/default"
@@ -68,8 +73,8 @@ worker_clusters = {
         max_nodes     = 3
       },
     ]
-  }
-}
+  },
+]
 
 labels = {
   environment = "production"

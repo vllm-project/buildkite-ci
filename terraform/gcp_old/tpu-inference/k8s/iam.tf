@@ -6,11 +6,17 @@ resource "google_service_account" "manager_nodes" {
   display_name = "Manager GKE Node SA"
 }
 
+# container.defaultNodeServiceAccount is GKE's maintained definition of what a
+# node needs to boot, log and report metrics, and a node gets nothing beyond it.
+# Every pod scheduled to a node can reach that node's identity, so anything a
+# workload needs belongs on the workload's own service account through Workload
+# Identity instead.
+#
+# It does not cover pulling private images; that is granted per repository
+# below, from var.image_repositories, to both node accounts.
 resource "google_project_iam_member" "manager_nodes" {
-  for_each = local.node_service_account_roles
-
   project = var.project_id
-  role    = each.value
+  role    = "roles/container.defaultNodeServiceAccount"
   member  = "serviceAccount:${google_service_account.manager_nodes.email}"
 }
 
@@ -35,11 +41,25 @@ resource "google_service_account" "worker_nodes" {
 }
 
 resource "google_project_iam_member" "worker_nodes" {
-  for_each = local.worker_node_role_bindings
+  for_each = var.worker_clusters
 
   project = each.value.project
-  role    = each.value.role
-  member  = "serviceAccount:${google_service_account.worker_nodes[each.value.worker_name].email}"
+  role    = "roles/container.defaultNodeServiceAccount"
+  member  = "serviceAccount:${google_service_account.worker_nodes[each.key].email}"
+}
+
+# Both bindings used to be indexed by role as well, back when a list of roles
+# looked like it would grow. Without these Terraform would revoke and re-grant
+# rather than re-index, and a moved block cannot be generated, so a new worker
+# cluster needs a line here until these are deleted after the next apply.
+moved {
+  from = google_project_iam_member.manager_nodes["roles/container.defaultNodeServiceAccount"]
+  to   = google_project_iam_member.manager_nodes
+}
+
+moved {
+  from = google_project_iam_member.worker_nodes["us-east5/roles/container.defaultNodeServiceAccount"]
+  to   = google_project_iam_member.worker_nodes["us-east5"]
 }
 
 resource "google_artifact_registry_repository_iam_member" "worker_nodes" {

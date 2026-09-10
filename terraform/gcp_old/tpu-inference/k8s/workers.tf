@@ -8,6 +8,30 @@
 # that does is a TPU node, which must land in its reservation's zone, and each
 # TPU pool pins that for itself.
 
+# Worker nodes are private too, and Private Google Access is not enough on its
+# own: it resolves Google's endpoints, so Artifact Registry and the GKE system
+# images work without egress, but Kueue and JobSet are published on
+# registry.k8s.io and time out. Per region, because a Cloud Router is regional.
+resource "google_compute_router" "worker" {
+  for_each = var.worker_clusters
+
+  name    = "${var.name_prefix}-wkr-${each.key}-router"
+  project = each.value.project
+  region  = each.value.location
+  network = each.value.network
+}
+
+resource "google_compute_router_nat" "worker" {
+  for_each = var.worker_clusters
+
+  name                               = "${var.name_prefix}-wkr-${each.key}-nat"
+  project                            = each.value.project
+  region                             = each.value.location
+  router                             = google_compute_router.worker[each.key].name
+  nat_ip_allocate_option             = "AUTO_ONLY"
+  source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
+}
+
 resource "google_container_cluster" "worker" {
   for_each = var.worker_clusters
 

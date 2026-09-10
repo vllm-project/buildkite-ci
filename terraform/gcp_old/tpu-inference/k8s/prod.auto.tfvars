@@ -6,6 +6,11 @@ network     = "projects/cloud-ullm-inference-ci-cd/global/networks/default"
 # why there is only the one.
 namespace = "buildkite"
 
+# The token the bare-metal agents already register with, so the kube fleet joins
+# the same Buildkite org as the queues it is replacing. Terraform grants read on
+# it and never owns its value.
+agent_token_secret_id = "vllm_buildkite_agent_token"
+
 # us-central1 to sit with the rest of the CI control plane: the monitoring VM,
 # the cache buckets, and the Artifact Registry these nodes pull from. The
 # manager holds no TPUs, so it is not tied to a reservation's zone.

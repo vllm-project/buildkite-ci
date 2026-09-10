@@ -246,6 +246,18 @@ def generate(tfvars: dict, out_dir: Path) -> dict:
 
     base = out_dir / manager_dir
     write(base / "system" / "10-kueue-config.yaml", kueue_config("manager"))
+    # Manager only. A worker's TPU pods do call buildkite-agent, but with the
+    # per-job access token the launcher forwards, not with this one - see the
+    # template.
+    write(
+        base / "workload" / "00-agent-token.yaml",
+        render(
+            "secret_sync",
+            NAMESPACE=namespace,
+            PROJECT_ID=project,
+            AGENT_TOKEN_SECRET_ID=tfvars["agent_token_secret_id"],
+        ),
+    )
     write(
         base / "system" / "20-auth-plugin.yaml",
         render(

@@ -102,6 +102,18 @@ variable "image_repositories" {
   default     = []
 }
 
+variable "agent_token_secret_id" {
+  type        = string
+  description = <<-EOT
+    Secret Manager secret holding the Buildkite agent token, in project_id.
+
+    Not created here: it predates this fleet and the bare-metal agents read the
+    same one, so Terraform reads it and grants access to it but never owns its
+    value. Named rather than defaulted because the grant is scoped to this one
+    secret, and a wrong default would be a grant on the wrong thing.
+  EOT
+}
+
 # The four variables below are read by scripts/generate_manifests.py, not by
 # any resource here. They live in the same tfvars so that the cluster and what
 # runs on it are described in one place and change in one review, and so that

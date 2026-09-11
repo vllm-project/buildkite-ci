@@ -7,7 +7,7 @@ dispatched to whichever worker cluster has the chips.
 
 Two clusters, and the split is the whole design:
 
-- **Manager** — `tpu-ci-manager`, Autopilot, `us-central1`. No TPUs. Runs the
+- **Manager** — `tpu-ci-manager`, Standard, `us-central1`. No TPUs. Runs the
   agent-stack-k8s controller, the Buildkite agent pods, and the Kueue that owns
   fleet-wide quota. This is where a step's agent lives and where its log goes.
 - **Worker** — `tpu-ci-us-east5`, Standard, `us-east5`. The chips. Reports to

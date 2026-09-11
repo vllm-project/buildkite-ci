@@ -41,3 +41,22 @@ resource "google_secret_manager_secret_iam_member" "launcher_analytics_token" {
   role      = "roles/secretmanager.secretAccessor"
   member    = local.launcher_principal
 }
+
+# The Hugging Face token, in the bare-metal agents' project. A model behind a
+# gate cannot be fetched without it, and the fleet's model cache is shared, so
+# the first step to want a gated model pays for every later one.
+data "google_secret_manager_secret" "hf_token" {
+  project   = var.hf_token_secret_project
+  secret_id = var.hf_token_secret_id
+}
+
+# Read by the launcher and forwarded into the workload with --env, so the value
+# is never a Kubernetes object and never appears in a pipeline. Same shape as
+# the Test Engine grant above and for the same reason: one secret, not the
+# project it happens to live in.
+resource "google_secret_manager_secret_iam_member" "launcher_hf_token" {
+  project   = var.hf_token_secret_project
+  secret_id = data.google_secret_manager_secret.hf_token.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = local.launcher_principal
+}

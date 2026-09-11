@@ -166,11 +166,21 @@ resource "google_container_node_pool" "worker_tpu" {
   # region and lands in zones that cannot serve the reservation.
   node_locations = [each.value.zone]
 
-  # total_, not the per-zone pair: one zone makes them equal today, but adding
-  # a second would quietly double a per-zone floor.
+  # The per-zone pair, not total_: node_locations above pins the pool to one
+  # zone, so the two carry the same number, but only this pair is the field GKE
+  # sizes a TPU slice against. Set as a total, the per-zone field arrives as
+  # zero and the pool is rejected - "Maximum node count 0 is not a valid size of
+  # TPU pod slice with topology 2x2x2" - which surfaces only on the shapes that
+  # span more than one host, since a single-host pool has no slice to divide.
+  #
+  # ANY rather than the default: TPU autoscaling wants the zone with capacity,
+  # and a balanced spread across zones cannot build a slice at all. Moot while
+  # node_locations is one zone, and stated so that adding a second does not
+  # quietly turn it on.
   autoscaling {
-    total_min_node_count = each.value.min_nodes
-    total_max_node_count = each.value.max_nodes
+    min_node_count  = each.value.min_nodes
+    max_node_count  = each.value.max_nodes
+    location_policy = "ANY"
   }
 
   management {

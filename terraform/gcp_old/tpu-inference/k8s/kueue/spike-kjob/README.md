@@ -70,9 +70,10 @@ From v0.1.0, the only release (January 2025), and from `pkg/cmd` on `main`:
 
 - **Commands**: `create`, `delete`, `describe`, `list`, `printcrds`, `version`.
 - **Modes**: `Interactive`, `Job`, `RayJob`, `RayCluster`, `Slurm`.
-- **`create job` flags that vary a run**: `--cmd`, `--parallelism`,
-  `--completions`, `--request`, `--localqueue`, `--priority`, `--time`,
-  `--pod-template-label`, `--pod-template-annotation`.
+- **`create job` flags that vary a run**: `--cmd`, `--request`, `--parallelism`,
+  `--completions`, `--time` (`pkg/cmd/create/create.go:290-299`), plus the
+  shared `--profile`, `--localqueue`, `--priority`, `--pod-template-label`,
+  `--pod-template-annotation` (same file, 510-522).
 
 Everything else about a workload lives in the `JobTemplate` the
 `ApplicationProfile` points at. That is the design, and it is a good one for the
@@ -102,6 +103,12 @@ submission.
 
 `kjobctl create job` has no `--image`. The image can only come from the
 `JobTemplate`, which is a cluster object written ahead of time.
+
+There is an `--init-image`, which is worth ruling out explicitly because a
+search for "image" in the source finds it: it is registered in the `slurm`
+block at `pkg/cmd/create/create.go:419`, not the `job` block at 290-299, and it
+sets the init container that stages a Slurm script rather than the workload's
+own image. It is not a way in.
 
 This is the structural part. It is not that we lose one feature - it is that the
 only ways out put us back where we started or somewhere worse:
@@ -242,9 +249,11 @@ Measured against `main` at the time of writing, so `job.yaml` here is 131 lines
 and does not include the `backoffLimit` change in flight on
 `launcher-cleanup-on-error`.
 
-The `kubectl-kjob` v0.1.0 darwin-arm64 binary could not be executed locally to
-produce a live `--dry-run` render; it is killed on startup in this sandbox. The
-capability claims above therefore come from the API types in `apis/v1alpha1`,
-the `pkg/cmd` tree, and the reference docs that are generated from that source -
-not from a live run. Anyone with a cluster and the CRDs installed can check them
-against `kubectl kjob create job --help`.
+The `kubectl-kjob` v0.1.0 darwin-arm64 binary could not be executed to produce a
+live `--dry-run` render; it is killed on startup in the sandbox this was written
+in. The capability claims above therefore rest on the source - the flag
+registrations in `pkg/cmd/create/create.go`, the API types in `apis/v1alpha1`,
+the `pkg/cmd` tree, and the reference docs generated from all of it - rather
+than on a live run. Each was read twice, independently, before being written
+down. Anyone with a cluster and the CRDs installed can check the lot against
+`kubectl kjob create job --help`.

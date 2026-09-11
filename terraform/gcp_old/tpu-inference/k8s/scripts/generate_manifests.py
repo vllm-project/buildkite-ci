@@ -81,6 +81,7 @@ MACHINE_MEMORY_GB = {
     "ct6e-standard-1t": 176,
     "ct6e-standard-4t": 720,
     "ct6e-standard-8t": 1440,
+    "tpu7x-standard-1t": 240,
     "tpu7x-standard-4t": 960,
 }
 

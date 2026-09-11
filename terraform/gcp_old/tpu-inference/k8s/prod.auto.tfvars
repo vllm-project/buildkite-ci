@@ -133,21 +133,48 @@ worker_clusters = [
     # the engines over HTTP wants real cores to keep hundreds of streams fed.
     system_machine_type = "e2-standard-16"
 
-    # Reservation cloudtpu-20251114223000-2002888989 in us-central1-c: 128 v7x
-    # chips, fully consumed, so the eight here are ones moved off an existing
-    # cluster rather than spare capacity.
+    # Three shapes over the same eight chips of the v7x reservation, which is
+    # every shape the tests ask for. The quota is not split between them: eight
+    # chips will not divide three ways and still leave each a whole slice, so
+    # all of it is nominal on 2x2x1 and the other two run on what that one is
+    # not using. Every pool's max_nodes is the full eight chips, so the cohort
+    # accounting decides how many run at once and the node pools only decide
+    # what a chip can be shaped into.
+    #
+    # min_nodes is 0 throughout: the reservation has no slack, so a floor is
+    # chips held out of it permanently rather than a warm node.
     tpu_node_pools = [
+      {
+        machine_type     = "tpu7x-standard-1t"
+        topology         = "1x1x1"
+        reservation_name = "cloudtpu-20251114223000-2002888989"
+        zone             = "us-central1-c"
+
+        min_nodes     = 0
+        nominal_nodes = 0
+        max_nodes     = 8
+      },
       {
         machine_type     = "tpu7x-standard-4t"
         topology         = "2x2x1"
         reservation_name = "cloudtpu-20251114223000-2002888989"
         zone             = "us-central1-c"
 
-        # No floor, so the chips go back to the reservation once a pool goes
-        # idle. max and nominal are equal because there is nothing free in the
-        # reservation to borrow beyond them.
         min_nodes     = 0
         nominal_nodes = 2
+        max_nodes     = 2
+      },
+      {
+        # Eight chips as one slice across two VMs, so this is the multi-host
+        # shape and GKE places it from a COMPACT policy. It takes the whole
+        # cohort, which means it waits for every other v7x workload to finish.
+        machine_type     = "tpu7x-standard-4t"
+        topology         = "2x2x2"
+        reservation_name = "cloudtpu-20251114223000-2002888989"
+        zone             = "us-central1-c"
+
+        min_nodes     = 0
+        nominal_nodes = 0
         max_nodes     = 2
       },
     ]

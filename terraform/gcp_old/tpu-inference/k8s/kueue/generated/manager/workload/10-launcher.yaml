@@ -104,12 +104,30 @@ data:
         accelerator_label: tpu-v6e-slice
         fuse_cache_size: 670Gi
         max_runtime_seconds: 10800
+      tpu7x-standard-1t-1x1x1:
+        queue: tpu7x-standard-1t-1x1x1
+        machine_type: tpu7x-standard-1t
+        chips: 1
+        hosts: 1
+        topology: 1x1x1
+        accelerator_label: tpu7x
+        fuse_cache_size: 111Gi
+        max_runtime_seconds: 10800
       tpu7x-standard-4t-2x2x1:
         queue: tpu7x-standard-4t-2x2x1
         machine_type: tpu7x-standard-4t
         chips: 4
         hosts: 1
         topology: 2x2x1
+        accelerator_label: tpu7x
+        fuse_cache_size: 447Gi
+        max_runtime_seconds: 10800
+      tpu7x-standard-4t-2x2x2:
+        queue: tpu7x-standard-4t-2x2x2
+        machine_type: tpu7x-standard-4t
+        chips: 4
+        hosts: 2
+        topology: 2x2x2
         accelerator_label: tpu7x
         fuse_cache_size: 447Gi
         max_runtime_seconds: 10800

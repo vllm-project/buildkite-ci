@@ -10,6 +10,8 @@ Two clusters, and the split is the whole design:
 - **Manager** — `tpu-ci-manager`, Standard, `us-central1`. No TPUs. Runs the
   agent-stack-k8s controller, the Buildkite agent pods, and the Kueue that owns
   fleet-wide quota. This is where a step's agent lives and where its log goes.
+  It declares no node pools: nodes are auto-provisioned per pending pod, from
+  the machine families the `manager-system` ComputeClass lists in order.
 - **Worker** — `tpu-ci-us-east5`, Standard, `us-east5`. The chips. Reports to
   the manager over Connect Gateway; runs no agent of its own.
 

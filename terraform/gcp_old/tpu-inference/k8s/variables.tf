@@ -125,8 +125,7 @@ variable "analytics_token_secret_id" {
     Secret Manager secret holding the Buildkite Test Engine token.
 
     Read by the launcher pod and forwarded into the workload, since a TPU pod
-    is the only thing that can see its own test output. On bare metal it comes
-    from the agent environment on the VM, which a pod has no equivalent of.
+    is the only thing that can see its own test output.
 
     Named rather than defaulted because the grant is scoped to this one secret.
   EOT

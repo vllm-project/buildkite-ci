@@ -274,11 +274,9 @@ def plan(cluster: dict, index: dict) -> list[Step]:
     """The install order, written once.
 
     The preview walks this same list, in this same order, which is the point of
-    it being a list. Held as two sequences of calls instead, the two drifted:
-    the preview took the whole generated tree as one -R, kubectl diff walked it
-    alphabetically, queues was read first, its missing namespace and CRDs
-    aborted the run - and an overlay that would have deleted half the Kueue
-    Deployment previewed clean.
+    it being a list: a preview that walks the tree its own way reads objects
+    before the namespace and CRDs they need, aborts, and reports clean on an
+    overlay that would have deleted half a Deployment.
     """
     base = DEFAULT_OUT / cluster["dir"]
     steps: list[Step] = [

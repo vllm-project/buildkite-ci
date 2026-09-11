@@ -1,9 +1,8 @@
 # What the manager's Kueue adds to common-config.yaml: it is the only cluster
 # that dispatches, so it is the only one that needs a way to reach a worker.
 #
-# Appended to that file rather than merged into it, so every key here has to be
-# a top-level key the common file does not already set. generate_manifests.py
-# refuses to render if that stops being true.
+# Appended to that file rather than merged, so every key here has to be one the
+# common file does not set. generate_manifests.py refuses to render otherwise.
 featureGates:
   # MultiKueue reads worker credentials from ClusterProfile objects rather than
   # from kubeconfig Secrets. GKE's fleet writes those profiles itself, so no
@@ -21,11 +20,10 @@ multiKueue:
           apiVersion: client.authentication.k8s.io/v1beta1
           command: /plugins/gcp-auth-plugin
           args:
-            # Without this the plugin mints its token by shelling out to
-            # `gcloud config config-helper`, and there is no gcloud in Kueue's
-            # distroless image. Application default credentials come from the
-            # GKE metadata server instead, which is where Workload Identity
-            # hands the controller its own identity - the one the gatewayEditor
-            # binding in iam.tf is granted to.
+            # Without this the plugin shells out to `gcloud config
+            # config-helper`, and Kueue's image is distroless. Application
+            # default credentials come from the metadata server instead, which
+            # is where Workload Identity hands the controller the identity
+            # iam.tf grants gatewayEditor to.
             - --use_application_default_credentials
           interactiveMode: Never

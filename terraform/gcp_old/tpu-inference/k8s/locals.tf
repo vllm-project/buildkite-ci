@@ -14,26 +14,22 @@ locals {
     "/subject/ns/kueue-system/sa/kueue-controller-manager",
   ])
 
-  # The launcher's service account on the manager cluster, as IAM sees it. The
-  # older syntax, matching the rest of this fleet's namespaced grants; it names
-  # the same principal as the Kueue controller's above.
-  #
-  # The account name is fixed by kueue/templates/launcher.yaml.tpl, which is
-  # rendered rather than declared here, and the namespace is shared with
-  # Terraform for exactly this reason - see var.namespace.
+  # The launcher's service account on the manager cluster, in the older syntax
+  # the rest of this fleet's namespaced grants use. The account name is fixed by
+  # kueue/templates/launcher.yaml.tpl, which is rendered rather than declared
+  # here, and the namespace is shared with Terraform for exactly this reason -
+  # see var.namespace.
   launcher_principal = "serviceAccount:${var.project_id}.svc.id.goog[${var.namespace}/tpu-launcher]"
 
-  # Worker clusters keyed by the pair that identifies one. The tfvars is a list
-  # so that nothing has to be invented to name a cluster, but for_each needs a
-  # key, and a positional index would renumber - and so destroy and rebuild -
-  # every cluster after one that was removed.
+  # Worker clusters keyed by the pair that identifies one, rather than by a
+  # positional index, which would renumber - and so rebuild - every cluster
+  # after one that was removed.
   #
   # Two names come out of that pair, because they have to be unique in two
-  # different places. A GKE cluster, a service account, a router, a NAT: each is
-  # scoped to a project, so the region alone names them and two projects may
-  # each hold a us-east5. The Terraform address, the rendered directory and the
-  # MultiKueueCluster are fleet-wide - every worker registers into the one
-  # manager, in the one namespace - so those carry the project as well.
+  # places. A cluster, a service account, a router, a NAT are all project
+  # scoped, so the region alone names them. The Terraform address, the rendered
+  # directory and the MultiKueueCluster are fleet-wide, so those carry the
+  # project too.
   workers = {
     for w in var.worker_clusters : "${w.project}/${w.location}" => merge(w, {
       short_name = w.location
@@ -81,22 +77,18 @@ locals {
   }
 
   # Both caches for every worker in one map, since one resource creates them all
-  # and one grants access to them all. What differs between the two entries is
-  # only retention and the purpose, so the rest is written once here.
+  # and one grants access to them all. Only retention and purpose differ.
   #
-  # The name is derived, and scripts/generate_manifests.py derives it the same
-  # way, because it has to put the same string into a PersistentVolume's
-  # volumeHandle. Keeping the two in step is a real hazard - a name computed
-  # twice is a name that can differ, and the failure is a volume pointing at a
-  # bucket that was never created - so deploy_manifests.py checks that every
-  # bucket a volume names exists before it applies anything.
+  # scripts/generate_manifests.py derives the same name, because it has to put
+  # it in a PersistentVolume's volumeHandle. A name computed twice is a name
+  # that can differ, and the failure is a volume pointing at a bucket that was
+  # never created, so deploy_manifests.py checks every bucket a volume names
+  # exists before applying.
   #
-  # The hash covers the project and the region, which is what identifies a
-  # cluster; the purpose is spelled out beside it rather than hashed in, so the
-  # two buckets of one cluster share a suffix and read as a pair. The project
-  # has to be in there because a bucket name is globally unique across the whole
-  # of GCP: without it, two organisations running this would ask for the same
-  # name and the second would be refused.
+  # The hash covers project and region, which is what identifies a cluster; the
+  # purpose is spelled out beside it so the two buckets of one cluster read as a
+  # pair. The project has to be in the hash because bucket names are globally
+  # unique, so two organisations running this would otherwise collide.
   workload_buckets = merge([
     for worker in var.worker_clusters : {
       for purpose, retention_days in {

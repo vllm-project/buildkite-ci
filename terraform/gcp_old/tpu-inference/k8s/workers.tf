@@ -36,12 +36,11 @@ resource "google_container_cluster" "worker" {
   for_each = local.workers
 
   # The region alone, because a cluster name is scoped to its project. It is
-  # also the Fleet membership ID, though, and every worker joins the manager's
-  # fleet whatever project it runs in - so two clusters in one region in
-  # different projects would ask for one membership and the second apply would
-  # be refused. Give one of them an explicit short name when that day comes:
-  # added as an optional field it renames nothing that already exists, which is
-  # why there is no such field yet.
+  # also the Fleet membership ID, and every worker joins the manager's fleet
+  # whatever project it runs in - so two clusters in one region in different
+  # projects would ask for one membership and the second apply would be
+  # refused. An optional short-name field would fix that without renaming
+  # anything that exists.
   name     = "${var.name_prefix}-${each.value.short_name}"
   project  = each.value.project
   location = each.value.location

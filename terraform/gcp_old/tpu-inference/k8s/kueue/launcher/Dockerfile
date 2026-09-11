@@ -1,11 +1,11 @@
 # The launcher image: the Google Cloud CLI plus PyYAML.
 #
 # The CLI image for the three things only it ships together - kubectl, gcloud,
-# and gke-gcloud-auth-plugin, without which the Connect Gateway credentials are
-# useless. PyYAML because it is the one thing it does not: the image's Python
-# is 3.13 and the only YAML under the SDK root is a Python 2 PyYAML whose own
-# imports fail. Installed here rather than at job time, so PyPI is not in the
-# path of every TPU step.
+# and gke-gcloud-auth-plugin, without which Connect Gateway credentials are
+# useless. PyYAML because it is the one thing it does not: the only YAML under
+# the SDK root is a Python 2 PyYAML whose imports fail on the image's 3.13.
+# Installed here rather than at job time, so PyPI is not in the path of every
+# TPU step.
 ARG CLOUD_SDK_VERSION
 FROM gcr.io/google.com/cloudsdktool/google-cloud-cli:${CLOUD_SDK_VERSION}
 

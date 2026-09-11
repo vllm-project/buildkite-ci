@@ -45,19 +45,16 @@ spec:
         # of thousands of entries and a prefetch that runs out of memory falls
         # back to a lookup per miss.
         gke-gcsfuse/metadata-prefetch-memory-limit: "2Gi"
-        # Unlimited sidecar CPU and memory. Parallel downloads are the whole
-        # reason a multi-gigabyte checkpoint arrives in one pass rather than
-        # eight sequential ones, and they are CPU-bound; the default limits
-        # throttle exactly the work we tuned for. Permitted on Standard
-        # clusters only, which these are.
+        # Unlimited sidecar CPU and memory. Parallel downloads are what make a
+        # multi-gigabyte checkpoint arrive in one pass rather than eight
+        # sequential ones, and they are CPU-bound, so the default limits
+        # throttle them. Permitted on Standard clusters only, which these are.
         gke-gcsfuse/cpu-limit: "0"
         gke-gcsfuse/memory-limit: "0"
     spec:
       restartPolicy: Never
-      # The identity the cache buckets authorise. Named rather than left as
-      # `default`, which every pod without this field runs as: granting cache
-      # writes to `default` would extend them to anything scheduled in this
-      # namespace, and a step chooses its own image.
+      # The identity the cache buckets authorise; see workload_sa.yaml.tpl for
+      # why it is not `default`.
       serviceAccountName: tpu-workload
       nodeSelector:
         cloud.google.com/gke-tpu-accelerator: ${ACCELERATOR_LABEL}
@@ -104,16 +101,15 @@ spec:
               mountPath: /cache/hf/hub
       volumes:
         # Backing store for the gcsfuse file cache, in RAM. The launcher sets
-        # sizeLimit from the machine type: half of host memory, which is 80Gi
-        # on ct6e-standard-1t's 176 GB and 670Gi on ct6e-standard-8t's 1440 GB,
-        # and one fixed number would be unsafe on the smallest or waste most of
-        # the largest. A sizeLimit, not a reservation - tmpfs holds only what is
-        # written.
+        # sizeLimit to half the machine type's memory - 80Gi on
+        # ct6e-standard-1t, 670Gi on ct6e-standard-8t - since one fixed number
+        # would be unsafe on the smallest shape or waste most of the largest.
+        # A sizeLimit, not a reservation: tmpfs holds only what is written.
         #
-        # Without this volume the sidecar falls back to 5GiB of ephemeral
-        # storage and fileCacheCapacity becomes a cheque it cannot cash: build
-        # 239 spent 113.6m of part2 loading checkpoints that way, against 8.8m
-        # with a cache that fits.
+        # Without it the sidecar falls back to 5GiB of ephemeral storage and
+        # fileCacheCapacity becomes a cheque it cannot cash - checkpoints are
+        # then refetched on every load, which costs more than an order of
+        # magnitude in load time.
         - name: gke-gcsfuse-cache
           emptyDir:
             medium: Memory
@@ -123,15 +119,10 @@ spec:
           emptyDir:
             medium: Memory
             sizeLimit: 16Gi
-        # Both caches are claims, not mounts.
-        #
-        # The bucket is regional - a cache in another region costs 502ms per
-        # miss against 36ms in-region - so its name differs per cluster. The
-        # PersistentVolume behind these claims holds it, created by ci-infra
-        # alongside the cluster, and the claim names are identical everywhere.
-        # That is also what survives MultiKueue placing this Job in another
-        # region: the claim resolves at mount time, in whichever cluster the pod
-        # landed in, where an inline volume is rendered before submission.
+        # Both caches are claims, not mounts: the bucket is regional, so its
+        # name differs per cluster, and only a claim resolves at mount time in
+        # whichever cluster MultiKueue placed this Job in. An inline volume
+        # would be rendered before submission. See cache_volumes.yaml.tpl.
         - name: jax-cache
           persistentVolumeClaim:
             claimName: jax-cache

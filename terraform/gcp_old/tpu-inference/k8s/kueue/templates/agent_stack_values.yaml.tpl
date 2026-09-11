@@ -1,36 +1,23 @@
-# Values for the agent-stack-k8s chart. Not a manifest: deploy_manifests.py
-# renders the chart with this and applies the result, so nothing under charts/
-# is ever applied on its own.
+# Values for the agent-stack-k8s chart. deploy_manifests.py renders the chart
+# with these and applies the result; helm is a renderer here, so there is no
+# release and no in-cluster Helm state.
 #
-# Committed and generated for the same reason the queues are - what the fleet is
-# configured to do should be readable in a diff. The chart's own output is not
-# committed, the way the Kueue and JobSet releases are not: it is upstream, it is
-# pinned by version, and helm is used here as a renderer and nothing more. There
-# is no release, no history and no in-cluster Helm state to reconcile against.
-#
-# Deliberately short. The chart writes the controller's config file by pasting
-# this block under three keys of its own - agent-token-secret, namespace and id -
-# and the controller parses that file with a YAML decoder that rejects a
-# duplicated key. So anything the chart already derives has to be left out and
-# set the way the chart derives it: the namespace from the render's --namespace,
-# the id from the release name.
+# Deliberately short. The chart pastes this block under three keys of its own -
+# agent-token-secret, namespace and id - and the controller parses the result
+# with a decoder that rejects a duplicated key, so anything the chart derives
+# must be left out.
 
-# Where the token comes from. The chart takes a Secret name, not a value, and
-# this one is written by the SecretSync in workload/ - so the token reaches the
-# cluster once, from Secret Manager, and the chart only refers to it.
-#
+# The chart takes a Secret name, not a value; workload/'s SecretSync writes it.
 # It becomes envFrom on the controller, so every key in that Secret is an
 # environment variable on it. Ours holds exactly one.
 agentStackSecret: ${AGENT_TOKEN_SECRET_NAME}
 
 config:
-  # One queue, and one controller behind it. A Buildkite queue no longer encodes
-  # a TPU shape: every TPU step goes through the launcher, which names a profile
-  # and submits the real workload to Kueue. Adding a shape is a regenerated
-  # profile registry, not another agent or another queue.
+  # One queue for the whole fleet. A queue does not encode a TPU shape: every
+  # TPU step goes through the launcher, so adding a shape is a regenerated
+  # profile registry rather than another queue.
   #
-  # The organization is not named anywhere here. The controller has not needed it
-  # since it stopped using the GraphQL API in 0.28.0; it now takes the org and
-  # the cluster from the agent token, which is why that token has to be a
+  # The organization is not named here. The controller takes the org and the
+  # cluster from the agent token, which is why that token has to be a
   # cluster's and not the organization's.
   queue: ${BUILDKITE_QUEUE}

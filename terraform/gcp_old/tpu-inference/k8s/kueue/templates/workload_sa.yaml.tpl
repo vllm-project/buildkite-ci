@@ -1,11 +1,9 @@
 ---
 # The identity a TPU workload runs as.
 #
-# Named rather than `default`, which is what every pod in the namespace gets
-# when none is set. The cache buckets grant object access to this principal, and
-# `default` would hand that to anything scheduled here - including a workload
-# image named by a pull request, since the launcher accepts any image it is
-# given.
+# Named rather than `default`: the cache buckets grant object access to this
+# principal, and `default` is what every pod in the namespace gets when none is
+# set - which would extend that access to anything scheduled here.
 #
 # No Google service account annotation: cache.tf grants the roles directly to
 # ${PROJECT_ID}.svc.id.goog[${NAMESPACE}/tpu-workload], so there is nothing to

@@ -236,14 +236,17 @@ def resolve_shape(doc, registry, where):
     )
 
 
-def admission_timeout(registry, profile):
-    """How long to wait for chips: the whole budget, less one full-length run.
+def admission_timeout(registry, doc):
+    """How long to wait for chips: the whole budget, less this run.
 
     Derived rather than configured, from the only two numbers worth choosing.
-    Longer leaves no room to run; shorter fails steps that were queueing.
+    Longer leaves no room to run; shorter fails steps that were queueing. Read
+    off the deadline cap_runtime settled on rather than the shape's default, so
+    a workload that asked to serve for ten hours is not also given eight to
+    queue in.
     """
-    return max(int(registry["total_max_seconds"])
-               - int(profile["max_runtime_seconds"]), 300)
+    runtime = max(int(spec["activeDeadlineSeconds"]) for spec in job_specs(doc))
+    return max(int(registry["total_max_seconds"]) - runtime, 300)
 
 
 def resolve_image(registry):
@@ -441,7 +444,7 @@ def render(path, image, name, shape):
     return coerce_ints(doc)
 
 
-def finalise(doc, profile, name, labels, owner, command, where):
+def finalise(doc, profile, registry, name, labels, owner, command, where):
     """Everything the launcher decides rather than the manifest."""
     meta = doc.setdefault("metadata", {})
     meta["name"] = name
@@ -474,24 +477,33 @@ def finalise(doc, profile, name, labels, owner, command, where):
         for container in workload:
             container["args"] = [command]
 
-    cap_runtime(doc, profile)
+    cap_runtime(doc, profile, registry)
     size_fuse_cache(doc, profile)
     state_node_affinity(doc)
     return doc
 
 
-def cap_runtime(doc, profile):
+def cap_runtime(doc, profile, registry):
     """Bound how long the workload may hold its chips.
 
-    A ceiling rather than a setting: a manifest that wants to fail sooner is
-    welcome to, but one that would outlast the step is holding a reservation
-    nothing is watching. Left to the manifest it is a number that has to be
-    right in every copy of it.
+    A default rather than a setting, because most steps have no opinion and the
+    number would otherwise have to be right in every copy of every manifest.
+    One that does have an opinion states activeDeadlineSeconds and is believed:
+    how long a workload runs is a property of the work, not of the hardware,
+    and a benchmark that serves for ten hours has no shape-derived number that
+    could know that.
+
+    The ceiling is the step's whole budget, which is the part that is always
+    true - a workload must not outlast the step watching it, or it is holding a
+    reservation nothing will clean up.
     """
-    limit = int(profile["max_runtime_seconds"])
+    default = int(profile["max_runtime_seconds"])
+    ceiling = int(registry["total_max_seconds"])
     for spec in job_specs(doc):
         current = spec.get("activeDeadlineSeconds")
-        spec["activeDeadlineSeconds"] = min(int(current), limit) if current else limit
+        spec["activeDeadlineSeconds"] = (
+            min(int(current), ceiling) if current else default
+        )
 
 
 def size_fuse_cache(doc, profile):
@@ -954,7 +966,7 @@ def main():
     # shell again, so joining plainly loses every quote the step wrote. `python
     # -c 'import jax; print(jax.devices())'` arrives as three arguments and
     # would go back out as an unquoted one-liner the second shell breaks on.
-    finalise(doc, profile, name, labels, owner_reference(),
+    finalise(doc, profile, registry, name, labels, owner_reference(),
              shlex.join(command) if command else None, manifest)
     kind = SUPPORTED_KINDS[doc["kind"]]
 
@@ -985,7 +997,7 @@ def main():
     )
 
     uid = kubectl_json("get", kind, name)["metadata"]["uid"]
-    admission_limit = admission_timeout(registry, profile)
+    admission_limit = admission_timeout(registry, doc)
     started = time.monotonic()
     admitted = False
     running = False

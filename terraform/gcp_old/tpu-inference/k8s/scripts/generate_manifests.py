@@ -21,11 +21,13 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import math
 import shutil
 import sys
 from pathlib import Path
 
 import hcl2
+import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 TFVARS = ROOT / "prod.auto.tfvars"
@@ -44,6 +46,59 @@ DEFAULT_OUT = ROOT / "kueue" / "generated"
 # there. Nothing outside this fleet refers to it, so the value itself is
 # arbitrary.
 AGENT_TOKEN_SECRET_NAME = "buildkite-agent-token"
+
+# The launcher's program, and the ConfigMap deploy_manifests.py builds out of
+# it. Not rendered into the generated tree: a second copy of a program as
+# indented YAML is not a diff anyone reads, and the two can disagree. Named
+# here because launcher.yaml.tpl's PodTemplate mounts that ConfigMap.
+LAUNCHER_SCRIPT = ROOT / "kueue" / "launcher" / "launch.py"
+LAUNCHER_SCRIPT_CONFIGMAP = "tpu-launcher-scripts"
+# The key is the file name under the mount, and the step's command is that
+# path: /opt/launcher/launch, not `python /opt/launcher/launch.py`.
+LAUNCHER_SCRIPT_KEY = "launch"
+
+# The Job a step gets when it names hardware and nothing else, deployed the
+# same way and for the same reason: it is a manifest, and a copy of it indented
+# into a ConfigMap is not one anyone can read a diff of.
+LAUNCHER_DEFAULT_JOB = ROOT / "kueue" / "launcher" / "job.yaml"
+LAUNCHER_MANIFEST_CONFIGMAP = "tpu-launcher-manifests"
+LAUNCHER_DEFAULT_JOB_KEY = "job.yaml"
+
+# The node label GKE puts on a TPU node, by machine family. Not derivable from
+# the machine type - a ct6e-standard-8t is `tpu-v6e-slice`, a tpu7x-standard-4t
+# is plain `tpu7x` - so these are read off live nodes.
+#
+# An unlisted family is an error rather than a guess: this is what pins a pod
+# to the pool its profile promised, and neither way of getting it wrong is
+# reported. A label no node carries waits forever; another family's lands on
+# the wrong chips.
+ACCELERATOR_LABELS = {
+    "ct6e": "tpu-v6e-slice",
+    "tpu7x": "tpu7x",
+}
+
+# Host memory per TPU machine type, from the accelerator-optimized machine
+# family documentation. Only the shapes we run are listed.
+MACHINE_MEMORY_GB = {
+    "ct6e-standard-1t": 176,
+    "ct6e-standard-4t": 720,
+    "ct6e-standard-8t": 1440,
+    "tpu7x-standard-4t": 960,
+}
+
+# How much of the host a workload's gcsfuse file cache may take. Memory, not
+# disk: the volume behind it is a `medium: Memory` emptyDir, which is why a
+# node's ephemeral storage does not bound it and too high shows up as an OOM.
+#
+# Per machine type, since host memory runs from 176 GB to 1440 GB across the
+# shapes we run. Only the pod's volume can vary that way - the per-mount
+# fileCacheCapacity in cache_volumes.yaml.tpl cannot, a PersistentVolume being
+# one object per cluster that every shape's pods bind, so that one is sized for
+# the smallest shape.
+FUSE_VOLUME_RATIO = 0.50
+# Small enough to be safe on any host, for a machine type not listed above. Too
+# low only costs read speed.
+FUSE_FALLBACK = "20Gi"
 
 
 # hcl2 defaults to output you can write back out as HCL, which is not what we
@@ -102,24 +157,89 @@ def cohort(queue: str) -> str:
     return queue.split("-")[0]
 
 
-def shapes(worker: dict) -> dict[str, int]:
-    """Chips under quota per node pool in a worker cluster, keyed by queue.
+def fuse_cache_size(machine_type: str) -> str:
+    """The workload's gcsfuse file cache on this machine type, as a GiB string.
+
+    GB to GiB as well as the ratio: the machine family documentation quotes
+    memory in decimal gigabytes and a Kubernetes quantity written Gi is binary,
+    so taking the number across unconverted would ask for 7% more of the host
+    than intended.
+    """
+    gb = MACHINE_MEMORY_GB.get(machine_type)
+    if gb is None:
+        return FUSE_FALLBACK
+    return f"{int(gb * FUSE_VOLUME_RATIO * 1000**3 / 1024**3)}Gi"
+
+
+def shapes(worker: dict) -> dict[str, dict]:
+    """Every TPU shape a worker cluster can run, keyed by queue name.
 
     A queue is named for its node pool - <machine type>-<topology>, e.g.
     ct6e-standard-8t-2x4, joined the same way locals.tf joins it - rather than
     for the cluster's copy of that pool, because two regions running the same
     shape are one queue on the manager and MultiKueue picks the region.
+
+    Everything here but the quota is a fact about the hardware, and it is the
+    same dict the launcher's profile registry is built from. So the queue that
+    admits a workload and the pod that lands on a node cannot disagree about
+    what the shape is: they are the same three lines of tfvars, read once.
     """
-    return {
-        f"{pool['machine_type']}-{pool['topology']}": (
-            # The machine type's last field is chips per VM, unlike the
-            # Buildkite queue names, where tpu7x-8 counts TensorCores and is a
-            # four-chip tpu7x-standard-4t.
-            int(pool["nominal_nodes"])
-            * int(pool["machine_type"].rsplit("-", 1)[-1].removesuffix("t"))
-        )
-        for pool in worker.get("tpu_node_pools", [])
-    }
+    out: dict[str, dict] = {}
+    for pool in worker.get("tpu_node_pools", []):
+        machine_type = pool["machine_type"]
+        topology = pool["topology"]
+        name = f"{machine_type}-{topology}"
+
+        # The machine type's last field is chips per VM - unlike the Buildkite
+        # queue names, where tpu7x-8 counts TensorCores and means a four-chip
+        # tpu7x-standard-4t.
+        chips = int(machine_type.rsplit("-", 1)[-1].removesuffix("t"))
+        slice_chips = math.prod(int(d) for d in topology.split("x"))
+        hosts, remainder = divmod(slice_chips, chips)
+        if remainder or not hosts:
+            raise ValueError(
+                f"{name}: a {topology} slice is {slice_chips} chips, which is "
+                f"not a whole number of {machine_type} hosts at {chips} chips "
+                "each"
+            )
+
+        family = machine_type.split("-")[0]
+        if family not in ACCELERATOR_LABELS:
+            raise KeyError(
+                f"{name}: no accelerator node label known for machine family "
+                f"{family!r}. Read cloud.google.com/gke-tpu-accelerator off a "
+                "node of that family and add it to ACCELERATOR_LABELS; it "
+                "cannot be derived from the machine type."
+            )
+
+        # A multi-host slice is admitted and built whole, so quota that is not
+        # a multiple of hosts is quota this shape can never use and a ceiling
+        # that is not one is a node pool GKE cannot build. Fail here rather
+        # than as a workload that queues forever.
+        for field in ("nominal_nodes", "max_nodes"):
+            if hosts > 1 and int(pool[field]) % hosts:
+                raise ValueError(
+                    f"{name}: {field}={pool[field]} is not a multiple of the "
+                    f"{hosts} hosts in a {topology} slice; a multi-host shape's "
+                    "quota has to be whole slices"
+                )
+
+        out[name] = {
+            "queue": name,
+            # How a step names this shape when it asks for the built-in Job.
+            # Stated rather than left implicit in the queue name, so the lookup
+            # reads the registry instead of re-splitting a string.
+            "machine_type": machine_type,
+            "chips": chips,
+            "hosts": hosts,
+            "topology": topology,
+            "accelerator_label": ACCELERATOR_LABELS[family],
+            "fuse_cache_size": fuse_cache_size(machine_type),
+            # The one number here that is a policy rather than a fact, and the
+            # only one Kueue reads: this shape's share of the reservation.
+            "quota": int(pool["nominal_nodes"]) * chips,
+        }
+    return out
 
 
 def queues(shapes: dict[str, int], namespace: str, checks: bool) -> str:
@@ -151,6 +271,57 @@ def queues(shapes: dict[str, int], namespace: str, checks: bool) -> str:
             )
         )
     return "".join(out)
+
+
+def launcher_profiles(fleet: dict, workers: list[str], tfvars: dict) -> str:
+    """The registry the launcher resolves a workload's hardware against.
+
+    One profile per shape, named for the shape, which is also the name of the
+    Kueue queue that admits it - so a workload asks for hardware that exists in
+    the fleet, or is refused before it is submitted. The manager's fleet-wide
+    queues are what a profile points at; which region actually runs it is
+    MultiKueue's to decide.
+
+    Everything a workload manifest is not trusted to state itself is here,
+    because it is here that it can be checked: the registries an image may come
+    from, the identities a pod may run as, and the budget the launcher derives
+    its admission deadline from.
+    """
+    return yaml.safe_dump(
+        {
+            # A step sets WORKLOAD_IMAGE and tpu-inference builds fork pull
+            # requests, so it is attacker-controlled. Empty means unrestricted.
+            "allowed_image_repos": tfvars["allowed_image_repos"],
+            # Identities a workload may run as: tpu-workload is the one the
+            # cache buckets authorise, default is for a manifest needing no
+            # cloud access. Neither can create JobSets, unlike the launcher's
+            # own account, which is the point.
+            "workload_service_accounts": ["default", "tpu-workload"],
+            "total_max_seconds": int(tfvars["tpu_total_max_seconds"]),
+            # How the launcher gets from an admitted workload to the pod logs.
+            # Kueue reports the cluster it dispatched to by MultiKueueCluster
+            # name, which is also the Fleet membership ID; memberships live in
+            # the manager's project whatever project the worker runs in.
+            "workers": {
+                name: {"membership": name, "project": tfvars["project_id"]}
+                for name in sorted(workers)
+            },
+            "profiles": {
+                name: {
+                    **{
+                        key: value
+                        for key, value in entry["shape"].items()
+                        # Kueue's, not the launcher's: what a shape's queue may
+                        # hold says nothing about where one workload runs.
+                        if key != "quota"
+                    },
+                    "max_runtime_seconds": int(tfvars["tpu_test_max_seconds"]),
+                }
+                for name, entry in sorted(fleet.items())
+            },
+        },
+        sort_keys=False,
+    )
 
 
 # On every generated file, because the tree is committed and so reads like
@@ -217,15 +388,24 @@ def generate(tfvars: dict, out_dir: Path) -> dict:
         )
 
         local = shapes(worker)
-        for name, chips in local.items():
-            entry = fleet.setdefault(name, {"chips": 0, "workers": []})
-            entry["chips"] += chips
+        for name, shape in local.items():
+            # The shape is stored once, not summed: two clusters running it
+            # run the same hardware. Only the quota adds up.
+            entry = fleet.setdefault(name, {"quota": 0, "workers": [], "shape": shape})
+            entry["quota"] += shape["quota"]
             entry["workers"].append(cluster_name)
 
         base = out_dir / worker_dir
         write(base / "system" / "10-kueue-config.yaml", kueue_config("worker"))
         write(base / "queues" / "00-namespace.yaml", render("namespace", NAMESPACE=namespace))
-        write(base / "queues" / "10-queues.yaml", queues(local, namespace, checks=False))
+        write(
+            base / "queues" / "10-queues.yaml",
+            queues(
+                {name: shape["quota"] for name, shape in local.items()},
+                namespace,
+                checks=False,
+            ),
+        )
         write(
             base / "queues" / "20-multikueue-rbac.yaml",
             render("multikueue_rbac_worker", PROJECT_ID=project),
@@ -251,6 +431,14 @@ def generate(tfvars: dict, out_dir: Path) -> dict:
                 ),
             ),
         )
+        # The launcher runs on the manager; all it wants here is to read the
+        # logs of the pods MultiKueue put in this cluster. PROJECT_ID is the
+        # manager's, because that is the Workload Identity pool the launcher's
+        # service account is federated through.
+        write(
+            base / "workload" / "20-launcher-rbac.yaml",
+            render("launcher_rbac_worker", NAMESPACE=namespace, PROJECT_ID=project),
+        )
 
     base = out_dir / manager_dir
     write(base / "system" / "10-kueue-config.yaml", kueue_config("manager"))
@@ -275,11 +463,30 @@ def generate(tfvars: dict, out_dir: Path) -> dict:
             AUTH_PLUGIN_SRC=tfvars["auth_plugin_source_path"],
         ),
     )
+    # Manager only, and after the agent token: the launcher pods are created by
+    # the controller that reads it, and every TPU step in the fleet goes through
+    # them. A worker gets only the log-reading grant above.
+    write(
+        base / "workload" / "10-launcher.yaml",
+        render(
+            "launcher",
+            NAMESPACE=namespace,
+            LAUNCHER_IMAGE=tfvars["launcher_image"],
+            LAUNCHER_PROFILES=indent(
+                launcher_profiles(
+                    fleet,
+                    [c["name"] for c in clusters if c["role"] == "worker"],
+                    tfvars,
+                ),
+                4,
+            ),
+        ),
+    )
     write(base / "queues" / "00-namespace.yaml", render("namespace", NAMESPACE=namespace))
     write(
         base / "queues" / "10-queues.yaml",
         queues(
-            {name: entry["chips"] for name, entry in fleet.items()},
+            {name: entry["quota"] for name, entry in fleet.items()},
             namespace,
             checks=True,
         ),

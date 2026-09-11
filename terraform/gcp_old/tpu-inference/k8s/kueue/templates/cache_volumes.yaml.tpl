@@ -153,8 +153,9 @@ spec:
       #
       # The pod must back this with a gke-gcsfuse-cache volume at least this
       # large, or the sidecar falls back to 5GiB of ephemeral storage and the
-      # capacity is nominal. The launcher sizes that volume per machine type in
-      # PR 7; until then a pod mounting these claims must size it itself.
+      # capacity is nominal. The launcher substitutes FUSE_CACHE_SIZE for that
+      # - half the machine type's memory, the volume being a RAM-backed
+      # emptyDir - and every shape this fleet runs clears 65Gi.
       fileCacheCapacity: "65Gi"
       # safetensors are memory-mapped, which is nothing but random reads. With
       # this false a 2.88 GiB checkpoint page-faulted over the network until the

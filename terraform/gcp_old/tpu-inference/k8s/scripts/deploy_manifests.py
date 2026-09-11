@@ -28,7 +28,18 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
-from generate_manifests import DEFAULT_OUT, TFVARS, generate, load_tfvars
+from generate_manifests import (
+    DEFAULT_OUT,
+    LAUNCHER_DEFAULT_JOB,
+    LAUNCHER_DEFAULT_JOB_KEY,
+    LAUNCHER_MANIFEST_CONFIGMAP,
+    LAUNCHER_SCRIPT,
+    LAUNCHER_SCRIPT_CONFIGMAP,
+    LAUNCHER_SCRIPT_KEY,
+    TFVARS,
+    generate,
+    load_tfvars,
+)
 
 # Server-side apply records which manager owns which field, and removes any
 # field a manager owned and then stopped sending. So the upstream release and
@@ -74,22 +85,27 @@ def ssa_flags(field_manager: str) -> list[str]:
     return ["--server-side", "--force-conflicts", f"--field-manager={field_manager}"]
 
 
-@dataclass(frozen=True)
-class Apply:
-    """One kubectl apply, and the preview of that same apply."""
+class Step:
+    """One kubectl apply, and the preview of that same apply.
 
-    what: str
-    source: str | Path
-    field_manager: str = FIELD_MANAGER
+    What varies between the steps below is only where the YAML comes from -
+    committed, rendered by helm, built by kubectl - and that is deliberately the
+    only thing that varies. There is one way of applying things and one way of
+    previewing them, so a step that produces its manifest at deploy time is
+    still previewed by `kubectl diff` against the same server-side merge the
+    apply will do.
+    """
 
-    def _target(self) -> list[str]:
-        # An upstream release is one file; ours are directories.
-        if isinstance(self.source, Path):
-            return ["-R", "-f", str(self.source)]
-        return ["-f", self.source]
+    field_manager: str
+
+    @contextmanager
+    def _target(self):
+        """The -f arguments naming what to apply, for the length of one step."""
+        raise NotImplementedError
 
     def run(self) -> None:
-        run_command("kubectl", "apply", *ssa_flags(self.field_manager), *self._target())
+        with self._target() as target:
+            run_command("kubectl", "apply", *ssa_flags(self.field_manager), *target)
 
     def diff(self) -> bool:
         """Preview it. False if the preview could not be produced.
@@ -108,25 +124,40 @@ class Apply:
         #
         # kubectl diff exits 1 when there are differences and above that when it
         # failed, so only the second is a problem.
-        cmd = ["kubectl", "diff", *ssa_flags(self.field_manager), *self._target()]
-        if subprocess.run(cmd).returncode > 1:
-            # On stderr, next to the error it is explaining.
-            print("  (could not diff the above; nothing installed yet, "
-                  "or the cluster rejected it)", file=sys.stderr)
-            return False
+        with self._target() as target:
+            cmd = ["kubectl", "diff", *ssa_flags(self.field_manager), *target]
+            if subprocess.run(cmd).returncode > 1:
+                # On stderr, next to the error it is explaining.
+                print("  (could not diff the above; nothing installed yet, "
+                      "or the cluster rejected it)", file=sys.stderr)
+                return False
         return True
 
 
 @dataclass(frozen=True)
-class Chart:
+class Apply(Step):
+    """A committed manifest, or an upstream release fetched by URL."""
+
+    what: str
+    source: str | Path
+    field_manager: str = FIELD_MANAGER
+
+    @contextmanager
+    def _target(self):
+        # An upstream release is one file; ours are directories.
+        if isinstance(self.source, Path):
+            yield ["-R", "-f", str(self.source)]
+        else:
+            yield ["-f", self.source]
+
+
+@dataclass(frozen=True)
+class Chart(Step):
     """An upstream Helm chart, rendered and then treated as any other manifest.
 
     helm is a renderer here and nothing else. There is no release, no history
     and no in-cluster Helm state, so `helm template` output goes through the
-    same server-side apply as everything else and `kubectl diff` still previews
-    it. That keeps one way of applying things and one way of previewing them,
-    which is what the Kueue and JobSet releases already do - the only difference
-    is that a chart needs rendering before it can be fetched by path.
+    same server-side apply as everything else.
 
     Not rendered at generate time into the committed tree, tempting as that is
     for reviewability: the output would then depend on the helm binary that
@@ -148,8 +179,7 @@ class Chart:
     field_manager: str = FIELD_MANAGER
 
     @contextmanager
-    def _rendered(self):
-        """The chart as a file on disk, for the length of one step."""
+    def _target(self):
         with tempfile.TemporaryDirectory() as tmp:
             # Fetched and rendered as two commands rather than one. helm prints
             # what it pulled from an OCI registry on stdout, in the middle of
@@ -164,7 +194,7 @@ class Chart:
                 "template", self.release, str(archive),
                 "--namespace", self.namespace, "--values", str(self.values),
             ))
-            yield out
+            yield ["-f", str(out)]
 
     @staticmethod
     def _helm(*args: str) -> str:
@@ -173,24 +203,47 @@ class Chart:
             raise SystemExit(f"failed: {shlex.join(('helm',) + args)}\n{proc.stderr}")
         return proc.stdout
 
-    def run(self) -> None:
-        with self._rendered() as path:
-            run_command("kubectl", "apply", *ssa_flags(self.field_manager),
-                        "-f", str(path))
 
-    def diff(self) -> bool:
-        with self._rendered() as path:
-            cmd = ["kubectl", "diff", *ssa_flags(self.field_manager),
-                   "-f", str(path)]
-            if subprocess.run(cmd).returncode > 1:
-                print("  (could not diff the above; nothing installed yet, "
-                      "or the cluster rejected it)", file=sys.stderr)
-                return False
-        return True
+@dataclass(frozen=True)
+class ConfigMapFile(Step):
+    """A file on disk, applied as the one key of a ConfigMap.
+
+    kubectl builds the object, so the file goes in verbatim - no template, no
+    indentation, and no second copy that can drift from the first. The
+    alternative is rendering it into the generated tree, which for the
+    launcher's program would mean committing it twice: once as something that
+    can be linted and run, and once as a thousand indented lines nobody reads a
+    diff of.
+
+    The cost is that this one object is not in kueue/generated/, so it is
+    reviewed as a change to the file rather than as a change to YAML. For a
+    program that is the better review anyway.
+    """
+
+    what: str
+    name: str
+    key: str
+    path: Path
+    namespace: str
+    field_manager: str = FIELD_MANAGER
+
+    @contextmanager
+    def _target(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            args = ["kubectl", "create", "configmap", self.name,
+                    "--namespace", self.namespace,
+                    f"--from-file={self.key}={self.path}",
+                    "--dry-run=client", "-o", "yaml"]
+            proc = subprocess.run(args, capture_output=True, text=True)
+            if proc.returncode:
+                raise SystemExit(f"failed: {shlex.join(args)}\n{proc.stderr}")
+            out = Path(tmp) / "configmap.yaml"
+            out.write_text(proc.stdout)
+            yield ["-f", str(out)]
 
 
 @dataclass(frozen=True)
-class Settle:
+class Settle(Step):
     """Wait for the controllers the applies before it installed."""
 
     what: str = "wait for the CRDs and the controllers"
@@ -217,7 +270,7 @@ class Settle:
         return True
 
 
-def plan(cluster: dict, index: dict) -> list[Apply | Chart | Settle]:
+def plan(cluster: dict, index: dict) -> list[Step]:
     """The install order, written once.
 
     The preview walks this same list, in this same order, which is the point of
@@ -228,7 +281,7 @@ def plan(cluster: dict, index: dict) -> list[Apply | Chart | Settle]:
     Deployment previewed clean.
     """
     base = DEFAULT_OUT / cluster["dir"]
-    steps: list[Apply | Chart | Settle] = [
+    steps: list[Step] = [
         # JobSet first: Kueue only enables its jobset integration for a CRD that
         # exists when the controller starts, and the rollout below is what makes
         # that true on a fresh cluster.
@@ -249,11 +302,27 @@ def plan(cluster: dict, index: dict) -> list[Apply | Chart | Settle]:
         Apply("queues", base / "queues"),
     ]
 
+    # Before the workload directory, whose PodTemplate mounts it. Manager only,
+    # keyed off the launcher manifest being rendered for this cluster.
+    if (base / "workload" / "10-launcher.yaml").is_file():
+        steps.append(ConfigMapFile(
+            "launcher program",
+            name=LAUNCHER_SCRIPT_CONFIGMAP,
+            key=LAUNCHER_SCRIPT_KEY,
+            path=LAUNCHER_SCRIPT,
+            namespace=index["namespace"],
+        ))
+        steps.append(ConfigMapFile(
+            "launcher default job",
+            name=LAUNCHER_MANIFEST_CONFIGMAP,
+            key=LAUNCHER_DEFAULT_JOB_KEY,
+            path=LAUNCHER_DEFAULT_JOB,
+            namespace=index["namespace"],
+        ))
+
     # What the namespace needs beyond its queues, which is not the same on both
-    # sides: the manager syncs the agent token, a worker gets the identity its
-    # TPU pods run as and the caches they mount. Conditional rather than assumed,
-    # because a cluster that needs neither should not have an empty directory
-    # applied to it.
+    # sides: the manager syncs the agent token and runs the launcher, a worker
+    # gets the identity its TPU pods run as and the caches they mount.
     if (base / "workload").is_dir():
         steps.append(Apply("workload identity, secrets and caches", base / "workload"))
 

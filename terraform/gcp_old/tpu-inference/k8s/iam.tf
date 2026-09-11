@@ -81,3 +81,23 @@ resource "google_project_iam_member" "kueue_manager_gateway" {
   role    = "roles/gkehub.gatewayEditor"
   member  = local.kueue_controller_principal
 }
+
+# The same gateway, for the launcher, which follows a workload into whichever
+# worker MultiKueue dispatched it to and streams the pod logs back. Project
+# scope for the reason above and no other: in a worker the launcher can do
+# nothing beyond the tpu-launcher-log-reader ClusterRole bound to it there.
+#
+# gatewayReader, not the controller's gatewayEditor, since reading logs is get,
+# list and watch. gkehub.viewer alongside it because resolving the membership -
+# `gcloud container fleet memberships get-credentials` - reads the membership.
+#
+# On var.project_id whatever project a worker runs in: workers.tf registers
+# every cluster into this project's fleet, so this is where the membership and
+# the gkeMemberships resource the gateway checks both live.
+resource "google_project_iam_member" "launcher_gateway" {
+  for_each = toset(["roles/gkehub.gatewayReader", "roles/gkehub.viewer"])
+
+  project = var.project_id
+  role    = each.value
+  member  = local.launcher_principal
+}

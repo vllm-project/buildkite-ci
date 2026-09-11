@@ -143,6 +143,9 @@ These files guide an agent but do not install timers or send scheduled alerts:
   daily CI runs.
 - [`pytorch-bump-triage.md`](pytorch-bump-triage.md): distinguish PyTorch or
   Triton bump regressions from failures already present on main.
+- [`vllm-main-ci-triage/`](vllm-main-ci-triage/): diagnose hard main-CI
+  failures, prepare narrow fixes, audit exact pull-request job coverage, and
+  record confirmed test-selection leaks.
 
 ## Validate changes
 

@@ -29,6 +29,24 @@ variable "manager_master_ipv4_cidr_block" {
   description = "RFC1918 /28 for the manager control plane. Must not overlap any worker cluster's block, because the manager peers with all of them."
 }
 
+variable "manager_system_machine_type" {
+  type        = string
+  description = "Machine type for the manager's nodes. Sized for the controllers plus the launcher pods, which are a kubectl and a Python script and want cores rather than memory."
+  default     = "e2-standard-4"
+}
+
+variable "manager_system_min_nodes" {
+  type        = number
+  description = "Scale-down floor for the manager. Two, so a node under repair does not take the fleet's whole control plane with it."
+  default     = 2
+}
+
+variable "manager_system_max_nodes" {
+  type        = number
+  description = "Ceiling for the manager. Bounded by the Buildkite controller's in-flight limit rather than by any TPU quota: a launcher pod waiting for chips occupies a node without holding any."
+  default     = 8
+}
+
 variable "labels" {
   type        = map(string)
   description = "Labels applied to every resource that takes them."

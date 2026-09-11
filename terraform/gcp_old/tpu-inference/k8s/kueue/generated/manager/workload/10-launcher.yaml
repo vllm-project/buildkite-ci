@@ -193,14 +193,20 @@ template:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.uid
-        # Requests only: Autopilot mirrors them into limits, so a limit above
-        # the request would be a request at the limit's size and a bill to
-        # match. Not as small as it looks - the launcher polls kubectl and
-        # gcloud, both Python, and holds log lines in memory.
+        # Not as small as it looks - the launcher polls kubectl and gcloud, both
+        # Python, and holds a poll's worth of log lines in memory.
+        #
+        # A memory limit and no cpu limit. The launcher shares its nodes with
+        # the controllers that run the fleet, so a step whose workload floods
+        # the log must not be able to take the Kueue controller down with it;
+        # cpu is left unbounded because throttling a poller only makes it slower
+        # to notice its workload finished.
         resources:
           requests:
             cpu: "500m"
             memory: 1Gi
+          limits:
+            memory: 2Gi
         volumeMounts:
           - name: launcher-scripts
             mountPath: /opt/launcher

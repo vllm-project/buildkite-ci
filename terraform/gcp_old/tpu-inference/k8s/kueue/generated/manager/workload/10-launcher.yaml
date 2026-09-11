@@ -81,6 +81,9 @@ data:
       HF_TOKEN:
         project: cloud-tpu-inference-test
         secret: bm-agent-hf-token
+      BUILDKITE_ANALYTICS_TOKEN:
+        project: cloud-tpu-inference-test
+        secret: tpu_commons_buildkite_analytics_token
     total_max_seconds: 39600
     workers:
       tpu-ci-us-central1:

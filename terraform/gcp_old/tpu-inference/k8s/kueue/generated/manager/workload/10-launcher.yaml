@@ -77,6 +77,10 @@ data:
     workload_service_accounts:
     - default
     - tpu-workload
+    env_secrets:
+      HF_TOKEN:
+        project: cloud-tpu-inference-test
+        secret: bm-agent-hf-token
     total_max_seconds: 39600
     workers:
       tpu-ci-us-central1:

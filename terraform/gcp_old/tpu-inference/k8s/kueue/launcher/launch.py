@@ -378,7 +378,35 @@ def pod_metadatas(doc):
     ]
 
 
-def forward_env(doc, names):
+def secret_env(registry, name):
+    """A value the fleet can supply for a name the step did not set.
+
+    Some names are the fleet's rather than any one pipeline's - the Hugging Face
+    token, without which a gated model cannot be fetched into the shared model
+    cache. Where the secret lives is fleet configuration, in the same tfvars as
+    the quota, so a pipeline should not have to know it or hold a grant on it.
+    The launcher does, and reads it here.
+
+    Only for names a step asked for by --env. Every workload holding the token
+    because the fleet has one would be a different and worse rule.
+    """
+    spec = (registry.get("env_secrets") or {}).get(name)
+    if not spec:
+        return ""
+    proc = subprocess.run(
+        ["gcloud", "secrets", "versions", "access", "latest",
+         f"--secret={spec['secret']}", f"--project={spec['project']}",
+         "--quiet"],
+        capture_output=True, text=True,
+    )
+    if proc.returncode != 0:
+        log(f"warning: could not read {name} from Secret Manager: "
+            f"{proc.stderr.strip().splitlines()[-1:] or ['no output']}")
+        return ""
+    return proc.stdout.strip()
+
+
+def forward_env(doc, names, registry):
     """Copy named step variables onto the workload container.
 
     Named explicitly rather than forwarded wholesale. There is no allowlist -
@@ -389,7 +417,10 @@ def forward_env(doc, names):
     """
     # Empty counts as unset: a step whose secret lookup came back with nothing
     # should fall through to the manifest, not overwrite a secretKeyRef with "".
-    values = [(n, os.environ[n]) for n in names if os.environ.get(n, "") != ""]
+    values = [
+        (n, os.environ.get(n, "") or secret_env(registry, n)) for n in names
+    ]
+    values = [(n, v) for n, v in values if v != ""]
     if not values:
         return []
     for spec in pod_specs(doc):
@@ -992,7 +1023,7 @@ def main():
     # shape a workload is: the pods'.
     profile = resolve_shape(doc, registry, manifest)
     validate(doc, registry, manifest)
-    forwarded = forward_env(doc, args.env)
+    forwarded = forward_env(doc, args.env, registry)
     if forwarded:
         log(f"forwarding step env: {', '.join(forwarded)}")
     # shlex.join, not " ".join: the step's own shell has already parsed the

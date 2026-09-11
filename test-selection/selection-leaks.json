@@ -449,6 +449,230 @@
         "reference_url": "https://github.com/vllm-project/vllm/pull/50611",
         "notes": "The culprit diff replaced a constructor-cached value with the failing lazy property; the same assertion appeared in four exact jobs."
       }
+    },
+    {
+      "id": "pr-55377-main-87778-lm-eval-pcp-4xb200",
+      "job_name": "B200 LM Eval PCP",
+      "job_key": "lm-eval-pcp-4xb200",
+      "culprit_pr": {
+        "number": 55377,
+        "url": "https://github.com/vllm-project/vllm/pull/55377",
+        "merge_commit": "7fa2c637968e2f7f7f815f3acc9ceb847a8a462d"
+      },
+      "pr_ci": {
+        "ran": false,
+        "state": "blocked",
+        "build_number": 87615,
+        "job_id": "01a07ee9-c300-4239-8a6f-8bf1db94bd57",
+        "url": "https://buildkite.com/vllm/ci/builds/87615#01a07ee9-c300-4239-8a6f-8bf1db94bd57"
+      },
+      "main_failure": {
+        "build_number": 87778,
+        "job_id": "01a082e3-5e32-44a0-ae49-19940319ea5a",
+        "url": "https://buildkite.com/vllm/ci/builds/87778#01a082e3-5e32-44a0-ae49-19940319ea5a",
+        "signature": "FlashInfer 32768-token autotune warmup exhausted B200 memory with a 12.22 GiB allocation"
+      },
+      "causal_confirmation": {
+        "kind": "fix",
+        "reference_url": "https://github.com/vllm-project/vllm/pull/55879",
+        "notes": "PR #55377 added the repeated full-model autotune warmup that triggered the OOM; the narrow memory-headroom fix passed the exact PCP evaluation in combined build #87893."
+      }
+    },
+    {
+      "id": "pr-54917-main-87778-spec-decode-speculators-mtp-nightly-b200",
+      "job_name": "B200 Spec Decode Speculators + MTP Nightly",
+      "job_key": "spec-decode-speculators-mtp-nightly-b200",
+      "culprit_pr": {
+        "number": 54917,
+        "url": "https://github.com/vllm-project/vllm/pull/54917",
+        "merge_commit": "f2d45f26bd6a2c841ffbd0030ebaefe87c274e58"
+      },
+      "pr_ci": {
+        "ran": false,
+        "state": "blocked",
+        "build_number": 87543,
+        "job_id": "01a07be1-82c2-41e0-b0c6-51c974b086e1",
+        "url": "https://buildkite.com/vllm/ci/builds/87543#01a07be1-82c2-41e0-b0c6-51c974b086e1"
+      },
+      "main_failure": {
+        "build_number": 87778,
+        "job_id": "01a082d3-624a-458b-90ee-ea78a2083257",
+        "url": "https://buildkite.com/vllm/ci/builds/87778#01a082d3-624a-458b-90ee-ea78a2083257",
+        "signature": "FlashInfer sliced omitted Gemma4 key and value tensors and raised TypeError on None"
+      },
+      "causal_confirmation": {
+        "kind": "fix",
+        "reference_url": "https://github.com/vllm-project/vllm/pull/55864",
+        "notes": "The fix made FlashInfer accept the omitted K/V tensors introduced by PR #54917 and preserved its intended KV-sharing optimization."
+      }
+    },
+    {
+      "id": "pr-53491-main-87842-lm-eval-pcp-4xb200",
+      "job_name": "B200 LM Eval PCP",
+      "job_key": "lm-eval-pcp-4xb200",
+      "culprit_pr": {
+        "number": 53491,
+        "url": "https://github.com/vllm-project/vllm/pull/53491",
+        "merge_commit": "4aadb0f14d4c0d6397cfba271f11906e980b18c1"
+      },
+      "pr_ci": {
+        "ran": false,
+        "state": "blocked",
+        "build_number": 87756,
+        "job_id": "01a0825e-835c-4ecc-847b-74c5dca67738",
+        "url": "https://buildkite.com/vllm/ci/builds/87756#01a0825e-835c-4ecc-847b-74c5dca67738"
+      },
+      "main_failure": {
+        "build_number": 87842,
+        "job_id": "01a084c1-e2fe-4c48-ad52-d632faaa1c74",
+        "url": "https://buildkite.com/vllm/ci/builds/87842#01a084c1-e2fe-4c48-ad52-d632faaa1c74",
+        "signature": "strict sync checking rejected a nonblocking H2D copy from an unpinned sparse MLA context-length buffer"
+      },
+      "causal_confirmation": {
+        "kind": "fix",
+        "reference_url": "https://github.com/vllm-project/vllm/pull/56138",
+        "notes": "The fix allocated sparse MLA context lengths in pinned CPU memory; the exact PCP evaluation passed in combined build #87893."
+      }
+    },
+    {
+      "id": "pr-53491-main-87842-qwen3-30b-a3b-fp8-block-sync-eplb-accuracy-2xb200",
+      "job_name": "B200 Qwen3-30B-A3B-FP8-block Sync EPLB Accuracy",
+      "job_key": "qwen3-30b-a3b-fp8-block-sync-eplb-accuracy-2xb200",
+      "culprit_pr": {
+        "number": 53491,
+        "url": "https://github.com/vllm-project/vllm/pull/53491",
+        "merge_commit": "4aadb0f14d4c0d6397cfba271f11906e980b18c1"
+      },
+      "pr_ci": {
+        "ran": false,
+        "state": "blocked",
+        "build_number": 87756,
+        "job_id": "01a0825e-82ef-4a61-be8c-db5c6016fdf1",
+        "url": "https://buildkite.com/vllm/ci/builds/87756#01a0825e-82ef-4a61-be8c-db5c6016fdf1"
+      },
+      "main_failure": {
+        "build_number": 87842,
+        "job_id": "01a084c1-e276-4461-8840-72950bfd187a",
+        "url": "https://buildkite.com/vllm/ci/builds/87842#01a084c1-e276-4461-8840-72950bfd187a",
+        "signature": "strict sync checking rejected a nonblocking H2D copy from the unpinned EPLB receive buffer"
+      },
+      "causal_confirmation": {
+        "kind": "fix",
+        "reference_url": "https://github.com/vllm-project/vllm/pull/56138",
+        "notes": "The fix pinned the Gloo EPLB receive staging buffer; the exact B200 accuracy job passed in build #87891."
+      }
+    },
+    {
+      "id": "pr-53491-main-87842-qwen3-30b-a3b-fp8-block-sync-eplb-accuracy-4xh100",
+      "job_name": "H100 Qwen3-30B-A3B-FP8-block Sync EPLB Accuracy",
+      "job_key": "qwen3-30b-a3b-fp8-block-sync-eplb-accuracy-4xh100",
+      "culprit_pr": {
+        "number": 53491,
+        "url": "https://github.com/vllm-project/vllm/pull/53491",
+        "merge_commit": "4aadb0f14d4c0d6397cfba271f11906e980b18c1"
+      },
+      "pr_ci": {
+        "ran": false,
+        "state": "blocked",
+        "build_number": 87756,
+        "job_id": "01a0825e-82f1-4af3-b9c7-00019bb6e213",
+        "url": "https://buildkite.com/vllm/ci/builds/87756#01a0825e-82f1-4af3-b9c7-00019bb6e213"
+      },
+      "main_failure": {
+        "build_number": 87842,
+        "job_id": "01a084c1-e279-4220-bfb8-9a21d3883e58",
+        "url": "https://buildkite.com/vllm/ci/builds/87842#01a084c1-e279-4220-bfb8-9a21d3883e58",
+        "signature": "strict sync checking rejected a nonblocking H2D copy from the unpinned EPLB receive buffer"
+      },
+      "causal_confirmation": {
+        "kind": "fix",
+        "reference_url": "https://github.com/vllm-project/vllm/pull/56138",
+        "notes": "The fix pinned the Gloo EPLB receive staging buffer; the exact H100 accuracy job passed in build #87891."
+      }
+    },
+    {
+      "id": "pr-53491-main-87842-kimi-linear-disaggregated",
+      "job_name": "H200 Kimi-Linear-48B-A3B Disaggregated DP EP",
+      "job_key": "kimi-linear-disaggregated",
+      "culprit_pr": {
+        "number": 53491,
+        "url": "https://github.com/vllm-project/vllm/pull/53491",
+        "merge_commit": "4aadb0f14d4c0d6397cfba271f11906e980b18c1"
+      },
+      "pr_ci": {
+        "ran": false,
+        "state": "blocked",
+        "build_number": 87756,
+        "job_id": "01a0825e-82da-4744-9b5f-53d11c9c02c9",
+        "url": "https://buildkite.com/vllm/ci/builds/87756#01a0825e-82da-4744-9b5f-53d11c9c02c9"
+      },
+      "main_failure": {
+        "build_number": 87842,
+        "job_id": "01a084c1-e264-4287-86fd-13bcc839f278",
+        "url": "https://buildkite.com/vllm/ci/builds/87842#01a084c1-e264-4287-86fd-13bcc839f278",
+        "signature": "strict sync checking rejected prepare_chunk_indices copying an unpinned CPU tensor to H200"
+      },
+      "causal_confirmation": {
+        "kind": "fix",
+        "reference_url": "https://github.com/vllm-project/vllm/pull/51540",
+        "notes": "The fix derives KDA chunk indices from existing host-side sequence lengths and transfers a pinned result."
+      }
+    },
+    {
+      "id": "pr-53491-main-87842-lm-eval-large-models-8xh200",
+      "job_name": "H200 LM Eval Large Models",
+      "job_key": "lm-eval-large-models-8xh200",
+      "culprit_pr": {
+        "number": 53491,
+        "url": "https://github.com/vllm-project/vllm/pull/53491",
+        "merge_commit": "4aadb0f14d4c0d6397cfba271f11906e980b18c1"
+      },
+      "pr_ci": {
+        "ran": false,
+        "state": "blocked",
+        "build_number": 87756,
+        "job_id": "01a0825e-8364-4a5b-90ec-e68e17c2696b",
+        "url": "https://buildkite.com/vllm/ci/builds/87756#01a0825e-8364-4a5b-90ec-e68e17c2696b"
+      },
+      "main_failure": {
+        "build_number": 87842,
+        "job_id": "01a084c1-e305-4b78-9f46-26d84eb7ec20",
+        "url": "https://buildkite.com/vllm/ci/builds/87842#01a084c1-e305-4b78-9f46-26d84eb7ec20",
+        "signature": "strict sync checking rejected a nonblocking H2D copy from an unpinned sparse MLA context-length buffer"
+      },
+      "causal_confirmation": {
+        "kind": "fix",
+        "reference_url": "https://github.com/vllm-project/vllm/pull/56138",
+        "notes": "The fix allocated sparse MLA context lengths in pinned CPU memory; both failing DeepSeek-V3.2 configurations exercise that path."
+      }
+    },
+    {
+      "id": "pr-55499-main-88213-distributed-model-tests-2-gpus",
+      "job_name": "L4 Distributed Models Shard 3",
+      "job_key": "distributed-model-tests-2-gpus",
+      "culprit_pr": {
+        "number": 55499,
+        "url": "https://github.com/vllm-project/vllm/pull/55499",
+        "merge_commit": "8c87c333b84c85908b1d11f0044457692277c6f3"
+      },
+      "pr_ci": {
+        "ran": false,
+        "state": "not_selected",
+        "build_number": 87983,
+        "job_id": null,
+        "url": "https://buildkite.com/vllm/ci/builds/87983"
+      },
+      "main_failure": {
+        "build_number": 88213,
+        "job_id": "01a08da5-ef81-445c-a56f-2150f673aeeb",
+        "url": "https://buildkite.com/vllm/ci/builds/88213#01a08da5-ef81-445c-a56f-2150f673aeeb",
+        "signature": "Maverick tensor-parallel workers could not re-initialize CUDA in forked subprocesses"
+      },
+      "causal_confirmation": {
+        "kind": "fix",
+        "reference_url": "https://github.com/vllm-project/vllm/pull/56423",
+        "notes": "The FlashInfer post-release bump introduced module-scope CUDA initialization before the fork-based test; spawning isolated tests passed all three exact L4 shards in build #88281."
+      }
     }
   ]
 }

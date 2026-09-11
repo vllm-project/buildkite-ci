@@ -13,8 +13,8 @@ substitutions:
   # Bumped when this Dockerfile changes without the base image changing, so a
   # tag always names one set of bytes.
   _REVISION: "1"
-  # The fleet's own repository, not tpu-inference-ci: that one holds the CI
-  # images a test runs, built from the tpu-inference repo and named by a step.
+  # The fleet's own repository, not tpu-inference-ci, which holds the CI images
+  # a test runs.
   _IMAGE: us-central1-docker.pkg.dev/cloud-ullm-inference-ci-cd/tpu-ci/launcher
 
 steps:

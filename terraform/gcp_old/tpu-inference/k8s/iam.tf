@@ -63,17 +63,14 @@ resource "google_artifact_registry_repository_iam_member" "worker_nodes" {
 # with no Google service account in between, so there is no key and nothing to
 # rotate; gke-gcloud-auth-plugin turns that identity into the gateway's token.
 #
-# On the project, which is the one grant here that is not scoped to the resource
-# it is about. Connect Gateway does not check gkehub.gateway.get against the
-# fleet membership; it checks its own resource, projects/<project>/
-# gkeMemberships/<id>, which carries no location and which a binding on the
-# membership does not cover. The same principal holding gatewayEditor on the
-# membership is refused with PERMISSION_DENIED, and the call succeeds only once
-# the role is held project-wide.
+# On the project - the one grant here not scoped to the resource it is about.
+# Connect Gateway checks gkehub.gateway.get against its own
+# projects/<project>/gkeMemberships/<id> resource, which a binding on the fleet
+# membership does not cover: the same principal holding gatewayEditor on the
+# membership is refused with PERMISSION_DENIED.
 #
-# So the bound on what the controller may do in a worker is not in IAM but in
-# the worker: the kueue-multikueue-remote ClusterRole that the generated
-# manifests bind to this principal is the whole of its access there.
+# So what bounds the controller inside a worker is not IAM but the
+# kueue-multikueue-remote ClusterRole the generated manifests bind it to there.
 resource "google_project_iam_member" "kueue_manager_gateway" {
   for_each = toset([for w in var.worker_clusters : w.project])
 
@@ -87,13 +84,12 @@ resource "google_project_iam_member" "kueue_manager_gateway" {
 # scope for the reason above and no other: in a worker the launcher can do
 # nothing beyond the tpu-launcher-log-reader ClusterRole bound to it there.
 #
-# gatewayReader, not the controller's gatewayEditor, since reading logs is get,
-# list and watch. gkehub.viewer alongside it because resolving the membership -
-# `gcloud container fleet memberships get-credentials` - reads the membership.
+# gatewayReader rather than gatewayEditor, since reading logs is get, list and
+# watch; gkehub.viewer alongside it because resolving the membership reads it.
 #
-# On var.project_id whatever project a worker runs in: workers.tf registers
-# every cluster into this project's fleet, so this is where the membership and
-# the gkeMemberships resource the gateway checks both live.
+# On var.project_id whatever project a worker runs in - workers.tf registers
+# every cluster into this project's fleet, so that is where the gkeMemberships
+# resource the gateway checks lives.
 resource "google_project_iam_member" "launcher_gateway" {
   for_each = toset(["roles/gkehub.gatewayReader", "roles/gkehub.viewer"])
 

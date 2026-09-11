@@ -42,9 +42,8 @@ kueue_version       = "0.19.0"
 jobset_version      = "0.12.0"
 agent_stack_version = "0.49.0"
 
-# A queue of its own rather than one of the names the bare-metal agents already
-# answer to, so the two fleets can run side by side and a pipeline moves over one
-# step at a time.
+# A queue of its own, so this fleet and the bare-metal one run side by side and
+# a pipeline moves over one step at a time.
 buildkite_queue = "kube"
 
 auth_plugin_image       = "gcr.io/google.com/cloudsdktool/google-cloud-cli:584.0.0"
@@ -63,8 +62,8 @@ launcher_image = "us-central1-docker.pkg.dev/cloud-ullm-inference-ci-cd/tpu-ci/l
 
 # A test may hold chips for three hours and a step may take eight in total,
 # queueing included; the launcher waits for admission for the difference. Both
-# are the bare-metal timeouts, so a step that moves here does not quietly get a
-# different budget.
+# match the bare-metal budgets, so a step moving between the two lanes gets the
+# same allowance.
 tpu_test_max_seconds  = 10800
 tpu_total_max_seconds = 28800
 

@@ -21,10 +21,9 @@ spec:
     matchLabels:
       kubernetes.io/metadata.name: ${NAMESPACE}${ADMISSION_CHECKS}
   resourceGroups:
-    # google.com/tpu is the only resource under quota. The cpu and memory a
-    # workload, its gcsfuse sidecar and any helper containers request are
-    # ignored here (quotaCheckStrategy: IgnoreUndeclared) and enforced by the
-    # kube scheduler against node capacity.
+    # google.com/tpu is the only resource under quota; everything else a pod
+    # requests is left to the kube scheduler. See quotaCheckStrategy in
+    # common-config.yaml.
     - coveredResources:
         - google.com/tpu
       flavors:

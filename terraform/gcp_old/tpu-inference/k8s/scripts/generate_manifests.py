@@ -48,9 +48,8 @@ DEFAULT_OUT = ROOT / "kueue" / "generated"
 AGENT_TOKEN_SECRET_NAME = "buildkite-agent-token"
 
 # The launcher's program, and the ConfigMap deploy_manifests.py builds out of
-# it. Not rendered into the generated tree: a second copy of a program as
-# indented YAML is not a diff anyone reads, and the two can disagree. Named
-# here because launcher.yaml.tpl's PodTemplate mounts that ConfigMap.
+# it. Not rendered into the generated tree: a program indented into YAML is not
+# a diff anyone reads. Named here because launcher.yaml.tpl mounts it.
 LAUNCHER_SCRIPT = ROOT / "kueue" / "launcher" / "launch.py"
 LAUNCHER_SCRIPT_CONFIGMAP = "tpu-launcher-scripts"
 # The key is the file name under the mount, and the step's command is that
@@ -58,8 +57,7 @@ LAUNCHER_SCRIPT_CONFIGMAP = "tpu-launcher-scripts"
 LAUNCHER_SCRIPT_KEY = "launch"
 
 # The Job a step gets when it names hardware and nothing else, deployed the
-# same way and for the same reason: it is a manifest, and a copy of it indented
-# into a ConfigMap is not one anyone can read a diff of.
+# same way and for the same reason.
 LAUNCHER_DEFAULT_JOB = ROOT / "kueue" / "launcher" / "job.yaml"
 LAUNCHER_MANIFEST_CONFIGMAP = "tpu-launcher-manifests"
 LAUNCHER_DEFAULT_JOB_KEY = "job.yaml"
@@ -87,14 +85,13 @@ MACHINE_MEMORY_GB = {
 }
 
 # How much of the host a workload's gcsfuse file cache may take. Memory, not
-# disk: the volume behind it is a `medium: Memory` emptyDir, which is why a
-# node's ephemeral storage does not bound it and too high shows up as an OOM.
+# disk: the volume behind it is a `medium: Memory` emptyDir, so a node's
+# ephemeral storage does not bound it and too high shows up as an OOM.
 #
 # Per machine type, since host memory runs from 176 GB to 1440 GB across the
-# shapes we run. Only the pod's volume can vary that way - the per-mount
-# fileCacheCapacity in cache_volumes.yaml.tpl cannot, a PersistentVolume being
-# one object per cluster that every shape's pods bind, so that one is sized for
-# the smallest shape.
+# shapes we run. Only the pod's volume can vary that way; the per-mount
+# fileCacheCapacity in cache_volumes.yaml.tpl is one object per cluster and so
+# is sized for the smallest shape.
 FUSE_VOLUME_RATIO = 0.50
 # Small enough to be safe on any host, for a machine type not listed above. Too
 # low only costs read speed.

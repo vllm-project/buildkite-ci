@@ -712,10 +712,9 @@ def worker_pods(env, job_id):
     """This workload's pods on the worker, or None if they could not be read.
 
     One read per turn of the loop, shared by everything that wants them: what
-    the pods are doing, what they printed, and why they stopped. They used to
-    be fetched once each, which is three round trips through Connect Gateway
-    for one answer - and the polling ahead of the first log line is deliberately
-    quick, so it was the busiest moment that paid for it three times.
+    the pods are doing, what they printed, and why they stopped. Fetching per
+    reader would cost three Connect Gateway round trips for one answer, and the
+    polling ahead of the first log line is deliberately quick.
 
     None rather than an empty list, because "no pods yet" and "could not ask"
     read differently in a step log.

@@ -21,12 +21,10 @@ data:
   controller_manager_config.yaml: |
     # Kueue controller configuration, on the manager and on every worker.
     #
-    # The manager holds the queues and the quota but no TPUs: it admits a workload
-    # and MultiKueue mirrors it onto a worker, whose own Kueue admits it a second
-    # time against local quota and runs it. Both sides therefore have to agree on
-    # what a workload is and on how it is admitted, which is everything in this
-    # file. manager-config.yaml adds the keys only the dispatching side needs, and
-    # is appended to this one by generate_manifests.py.
+    # A workload is admitted twice - once by the manager against fleet quota, again
+    # by the worker against local quota - so both sides have to agree on what a
+    # workload is and how it is admitted, which is everything in this file.
+    # manager-config.yaml adds the keys only the dispatching side needs.
     apiVersion: config.kueue.x-k8s.io/v1beta2
     kind: Configuration
     manageJobsWithoutQueueName: false
@@ -41,11 +39,10 @@ data:
       resourceName: c1f6bfd2.kueue.x-k8s.io
     resources:
       # Check only the resources a ClusterQueue declares. A TPU pod also requests
-      # cpu, memory and ephemeral-storage - its own, its gcsfuse sidecar's, and the
-      # helper containers agent-stack-k8s injects - and under the default
-      # BlockUndeclared any of those would make the workload inadmissible against a
-      # queue that covers google.com/tpu alone. The kube scheduler enforces them
-      # against node capacity, which is where they belong.
+      # cpu, memory and ephemeral-storage - its own and its gcsfuse sidecar's - and
+      # under the default BlockUndeclared any of those makes the workload
+      # inadmissible against a queue covering google.com/tpu alone. The kube
+      # scheduler enforces them against node capacity, which is where they belong.
       quotaCheckStrategy: IgnoreUndeclared
     integrations:
       frameworks:

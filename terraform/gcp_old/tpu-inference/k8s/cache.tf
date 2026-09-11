@@ -1,20 +1,18 @@
 # A cache bucket pair per worker cluster, in that cluster's own region.
 #
 # The caches are the largest single lever on how efficiently the fleet uses its
-# chips, and distance is what decides their cost. Measured from a pod against a
-# bucket 10,000 km away, a compilation-cache miss took 502ms; against a bucket
-# in the cluster's region, 36ms. A compile-heavy step asks whether an entry
-# exists far more often than it reads one, so that difference moved a full suite
-# from 1.60x bare metal's chip-minutes to 0.80x.
+# chips, and distance decides their cost: a compilation-cache miss costs about
+# 502ms against a bucket 10,000 km away and 36ms against one in the cluster's
+# region. A compile-heavy step asks whether an entry exists far more often than
+# it reads one, so out-of-region caches roughly double a suite's chip-minutes.
 #
 # Two buckets rather than one with two prefixes. The gcsfuse CSI driver
 # identifies a volume by volumeHandle, which is the bucket name, so two
-# PersistentVolumes over one bucket are a single volume to the kubelet: it
-# mounts once and both mountPaths land on the same directory. That is not
-# hypothetical - /cache/jax listed the model cache. Separate buckets also let
-# the two keep their own retention, which they want, since compilation output is
-# cheap to recreate and churns constantly while a model is expensive to fetch
-# and rarely changes.
+# PersistentVolumes over one bucket are one volume to the kubelet: it mounts
+# once and both mountPaths land on the same directory, so /cache/jax lists the
+# model cache. It also lets the two keep their own retention: compilation
+# output is cheap to recreate and churns, a model is expensive to fetch and
+# rarely changes.
 
 resource "google_storage_bucket" "workload" {
   for_each = local.workload_buckets
@@ -26,31 +24,23 @@ resource "google_storage_bucket" "workload" {
   uniform_bucket_level_access = true
   storage_class               = "STANDARD"
 
-  # Real folders, chosen now because it cannot be chosen later: hierarchical
-  # namespace is fixed when a bucket is created and changing it means replacing
-  # the bucket.
+  # Real folders, and fixed at creation - changing it means replacing the
+  # bucket. It matters because of how gcsfuse writes: every write goes to a
+  # temporary object and is then renamed, which on a flat bucket is a copy plus
+  # a delete. HNS makes it an atomic folder operation with up to 8x the initial
+  # QPS limit. Requires uniform bucket-level access, set above.
   #
-  # It matters here because of how gcsfuse writes. Every write goes to a
-  # temporary object and is then renamed, and on a flat bucket a rename is a
-  # copy followed by a delete. HNS makes it a folder operation - atomic, and
-  # with up to 8x the initial QPS limit. Requires uniform bucket-level access,
-  # which is set above.
-  #
-  # What it costs: no object versioning, retention lock, bucket lock,
-  # cross-bucket replication or object-level ACLs. A rebuildable cache uses
-  # none of those.
+  # It rules out object versioning, retention and bucket lock, cross-bucket
+  # replication and object-level ACLs. A rebuildable cache uses none of those.
   hierarchical_namespace {
     enabled = true
   }
 
-  # No soft delete. It is on by default with a seven-day retention, and
-  # soft-deleted objects keep accruing storage charges for the whole of it.
-  #
-  # That is the wrong default for these buckets specifically: gcsfuse renames
-  # through copy-and-delete, and the lifecycle rule below deletes on a schedule,
-  # so a cache generates deletions continuously. Retaining a week of them would
-  # cost more than the cache itself, to protect data that is by construction
-  # recomputable.
+  # No soft delete. It defaults to on with seven days' retention, and
+  # soft-deleted objects accrue storage charges for the whole of it. A cache
+  # deletes continuously - gcsfuse renames through copy-and-delete, and the
+  # lifecycle rule below expires on a schedule - so a week of them would cost
+  # more than the cache itself, to protect data that is recomputable.
   soft_delete_policy {
     retention_duration_seconds = 0
   }
@@ -94,19 +84,13 @@ resource "google_storage_bucket" "workload" {
   })
 }
 
-# Bucket-scoped and additive on purpose.
+# Bucket-scoped and additive on purpose. _member manages exactly one (bucket,
+# role, member) tuple; _binding would own the whole role and _policy the whole
+# bucket, either of which fights anything else managing IAM here.
 #
-# _member manages exactly one (bucket, role, member) tuple. _binding would own
-# the whole role and _policy the whole bucket, either of which fights anything
-# else that manages IAM here - terraform reverting their change, them reverting
-# terraform's.
-#
-# The member is the Kubernetes service account itself, federated by Workload
-# Identity into a principal that can hold a role. There is no Google service
-# account to impersonate and so no key anywhere. It is granted to tpu-workload
-# rather than to the namespace's default account, because default is what a pod
-# gets when it names none - and the launcher will run images named by a pull
-# request.
+# Granted to tpu-workload rather than the namespace's default account, since
+# default is what a pod gets when it names none - and the launcher will run
+# images named by a pull request.
 resource "google_storage_bucket_iam_member" "workload" {
   for_each = local.workload_buckets
 

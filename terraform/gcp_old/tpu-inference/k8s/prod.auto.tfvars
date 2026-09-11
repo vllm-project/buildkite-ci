@@ -112,10 +112,70 @@ worker_clusters = [
         # No floor: eight chips is too much of what is free to leave parked, so
         # this shape boots a node per job.
         min_nodes = 0
-        # One slice, which is what the disagg benchmark takes. Room for two more
-        # by borrowing whatever the single-chip queue is not using.
+        # One slice guaranteed, and room for two more by borrowing whatever the
+        # single-chip queue is not using.
         nominal_nodes = 1
         max_nodes     = 3
+      },
+    ]
+  },
+
+  # The v7x lane, in us-central1 because that is where its reservation is.
+  {
+    project                = "cloud-ullm-inference-ci-cd"
+    location               = "us-central1"
+    network                = "projects/cloud-ullm-inference-ci-cd/global/networks/default"
+    subnetwork             = "projects/cloud-ullm-inference-ci-cd/regions/us-central1/subnetworks/default"
+    master_ipv4_cidr_block = "172.16.0.64/28"
+
+    # Larger than the e2-standard-4 default, because a workload role that holds
+    # no chips lands here rather than on a TPU node - a benchmark client driving
+    # the engines over HTTP wants real cores to keep hundreds of streams fed.
+    system_machine_type = "e2-standard-16"
+
+    # Three shapes over the same eight chips of the v7x reservation, which is
+    # every shape the tests ask for. The quota is not split between them: eight
+    # chips will not divide three ways and still leave each a whole slice, so
+    # all of it is nominal on 2x2x1 and the other two run on what that one is
+    # not using. Every pool's max_nodes is the full eight chips, so the cohort
+    # accounting decides how many run at once and the node pools only decide
+    # what a chip can be shaped into.
+    #
+    # min_nodes is 0 throughout: the reservation has no slack, so a floor is
+    # chips held out of it permanently rather than a warm node.
+    tpu_node_pools = [
+      {
+        machine_type     = "tpu7x-standard-1t"
+        topology         = "1x1x1"
+        reservation_name = "cloudtpu-20251114223000-2002888989"
+        zone             = "us-central1-c"
+
+        min_nodes     = 0
+        nominal_nodes = 0
+        max_nodes     = 8
+      },
+      {
+        machine_type     = "tpu7x-standard-4t"
+        topology         = "2x2x1"
+        reservation_name = "cloudtpu-20251114223000-2002888989"
+        zone             = "us-central1-c"
+
+        min_nodes     = 0
+        nominal_nodes = 2
+        max_nodes     = 2
+      },
+      {
+        # Eight chips as one slice across two VMs, so this is the multi-host
+        # shape and GKE places it from a COMPACT policy. It takes the whole
+        # cohort, which means it waits for every other v7x workload to finish.
+        machine_type     = "tpu7x-standard-4t"
+        topology         = "2x2x2"
+        reservation_name = "cloudtpu-20251114223000-2002888989"
+        zone             = "us-central1-c"
+
+        min_nodes     = 0
+        nominal_nodes = 0
+        max_nodes     = 2
       },
     ]
   },

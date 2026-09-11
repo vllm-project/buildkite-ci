@@ -295,6 +295,16 @@ def launcher_profiles(fleet: dict, workers: list[str], tfvars: dict) -> str:
             # cloud access. Neither can create JobSets, unlike the launcher's
             # own account, which is the point.
             "workload_service_accounts": ["default", "tpu-workload"],
+            # Names the launcher can supply itself when a step forwards one it
+            # does not have. Fleet-wide credentials, held by the launcher's
+            # account so a pipeline needs no grant of its own - and still only
+            # reaching a workload that asked by name.
+            "env_secrets": {
+                "HF_TOKEN": {
+                    "project": tfvars["hf_token_secret_project"],
+                    "secret": tfvars["hf_token_secret_id"],
+                },
+            },
             "total_max_seconds": int(tfvars["tpu_total_max_seconds"]),
             # How the launcher gets from an admitted workload to the pod logs.
             # Kueue reports the cluster it dispatched to by MultiKueueCluster

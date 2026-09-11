@@ -214,12 +214,12 @@ do not deploy into the middle of something that cannot tolerate it. JobSet's
 webhooks are also `Fail`, though those are narrowed to pods that already carry a
 JobSet label.
 
-**Autopilot writes a nodeAffinity into any podspec that lacks one** —
-`cloud.google.com/extended-duration-pods`. MultiKueue copies the podspec to the
-worker unchanged, no Standard node carries that label, and the pod is then
-unschedulable with nothing reporting an error: the step simply waits out its
-timeout. The launcher always states an affinity of its own to prevent it. If you
-write a podspec that reaches the worker by some other path, state one too.
+**No cluster in this fleet may be Autopilot.** Autopilot writes a nodeAffinity
+on `cloud.google.com/extended-duration-pods` into any podspec that arrives
+without one. MultiKueue copies the podspec to the worker unchanged, no Standard
+node carries that label, and the pod is then unschedulable with nothing
+reporting an error: the step simply waits out its timeout. The manager is where
+every workload podspec is born, so that is the one it would break.
 
 **A very short workload can lose its output.** MultiKueue deletes the remote Job
 when it completes and the pods go with it, so a workload that lives a few

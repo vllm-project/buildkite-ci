@@ -25,6 +25,17 @@ resource "google_container_cluster" "manager" {
   remove_default_node_pool = true
   initial_node_count       = 1
 
+  # Only ever the pool that `remove_default_node_pool` deletes again, and it is
+  # named because the default is `e2-medium` in every zone of the region at
+  # once: four nodes created to be thrown away, and a shortage in any one of
+  # them fails the whole cluster create. us-central1 runs out of e2 regularly.
+  #
+  # It is read at create and never again - see the lifecycle block, without
+  # which every later apply tries to update a pool that is not there.
+  node_config {
+    machine_type = var.manager_bootstrap_machine_type
+  }
+
   deletion_protection = var.deletion_protection
 
   release_channel {
@@ -84,61 +95,69 @@ resource "google_container_cluster" "manager" {
       rotation_interval = "300s"
     }
   }
-}
 
-# The only pool: the Kueue and JobSet controllers, the Buildkite controller, the
-# secret sync, and one launcher pod per TPU step in flight. No taint and no
-# label, because everything here is the fleet's own control plane and there is
-# nothing to keep apart.
-#
-# The floor is two nodes rather than one so that a node under repair does not
-# take the whole control plane with it. The ceiling follows the Buildkite
-# controller's in-flight limit: a launcher pod waiting on quota still occupies a
-# node, so the pods that can exist at once, not the chips, is what has to fit.
-resource "google_container_node_pool" "manager_system" {
-  name     = "system"
-  project  = var.project_id
-  cluster  = google_container_cluster.manager.name
-  location = var.manager_region
+  # There are no fixed node pools here. Every node this cluster runs is created
+  # by GKE for a pod that is already pending, from whichever machine family and
+  # zone has capacity at that moment - see the ComputeClass in
+  # kueue/templates/compute_class.yaml.tpl for the order it tries them in.
+  #
+  # A pool pinned to one machine type in one region is a stockout away from the
+  # fleet having no control plane, and it is not a hypothetical: the first
+  # attempt at this cluster failed to create at all because us-central1 was out
+  # of e2. Nothing here holds accelerators or state, so there is nothing to lose
+  # by letting the shape of a node be decided at scale-up.
+  #
+  # The limits are the fleet's ceiling, not a pool's: a launcher pod waiting on
+  # quota occupies a node without holding a chip, so what has to fit is the
+  # Buildkite controller's in-flight limit rather than any TPU count.
+  cluster_autoscaling {
+    enabled = true
 
-  # total_, not the per-zone min_node_count/max_node_count: in a regional
-  # cluster those are multiplied by the number of zones, so a floor of 2 would
-  # quietly become two nodes per zone.
-  autoscaling {
-    total_min_node_count = var.manager_system_min_nodes
-    total_max_node_count = var.manager_system_max_nodes
+    resource_limits {
+      resource_type = "cpu"
+      maximum       = var.manager_max_cpu
+    }
+
+    resource_limits {
+      resource_type = "memory"
+      maximum       = var.manager_max_memory_gb
+    }
+
+    auto_provisioning_defaults {
+      # Off the project default compute account, which holds tpu.admin,
+      # storage.admin and project-wide secretmanager.secretAccessor because the
+      # bare-metal agent VMs share it.
+      service_account = google_service_account.manager_nodes.email
+      oauth_scopes    = ["https://www.googleapis.com/auth/cloud-platform"]
+
+      disk_type  = "pd-balanced"
+      disk_size  = 100
+      image_type = "COS_CONTAINERD"
+
+      management {
+        auto_repair  = true
+        auto_upgrade = true
+      }
+
+      shielded_instance_config {
+        enable_integrity_monitoring = true
+        enable_secure_boot          = true
+      }
+    }
   }
 
-  management {
-    auto_repair  = true
-    auto_upgrade = true
-  }
+  lifecycle {
+    ignore_changes = [
+      # The default pool this describes is deleted seconds after it is created,
+      # so an apply that tried to reconcile it would fail on a pool that is not
+      # there - which is exactly what happened: "Node pool default-pool not
+      # found on update". Nothing runs on it, and every node that does run here
+      # comes from auto-provisioning, so there is nothing here worth tracking.
+      node_config,
 
-  node_config {
-    machine_type = var.manager_system_machine_type
-    image_type   = "COS_CONTAINERD"
-
-    # Off the project default compute account, which holds tpu.admin,
-    # storage.admin and project-wide secretmanager.secretAccessor because the
-    # bare-metal agent VMs share it.
-    service_account = google_service_account.manager_nodes.email
-    oauth_scopes    = ["https://www.googleapis.com/auth/cloud-platform"]
-
-    workload_metadata_config {
-      mode = "GKE_METADATA"
-    }
-
-    shielded_instance_config {
-      enable_integrity_monitoring = true
-      enable_secure_boot          = true
-    }
-
-    labels = {
-      "tpu-ci.google.com/role" = "manager"
-    }
-
-    metadata = {
-      disable-legacy-endpoints = "true"
-    }
+      # GKE turns these on by itself and reports them back, so they diff on
+      # every plan if tracked.
+      monitoring_config,
+    ]
   }
 }

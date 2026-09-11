@@ -47,6 +47,13 @@ DEFAULT_OUT = ROOT / "kueue" / "generated"
 # arbitrary.
 AGENT_TOKEN_SECRET_NAME = "buildkite-agent-token"
 
+# The ComputeClass the manager's nodes are created from, and the name the
+# manager's namespace points at to make it the default for everything in it.
+# Here rather than in either template because it is the join between them: a
+# namespace whose default names a class that does not exist leaves every pod in
+# it pending. Worker clusters have fixed TPU pools and get neither.
+MANAGER_COMPUTE_CLASS = "manager-system"
+
 # The launcher's program, and the ConfigMap deploy_manifests.py builds out of
 # it. Not rendered into the generated tree: a program indented into YAML is not
 # a diff anyone reads. Named here because launcher.yaml.tpl mounts it.
@@ -405,7 +412,10 @@ def generate(tfvars: dict, out_dir: Path) -> dict:
 
         base = out_dir / worker_dir
         write(base / "system" / "10-kueue-config.yaml", kueue_config("worker"))
-        write(base / "queues" / "00-namespace.yaml", render("namespace", NAMESPACE=namespace))
+        write(
+            base / "queues" / "00-namespace.yaml",
+            render("namespace", NAMESPACE=namespace, EXTRA_LABELS=""),
+        )
         write(
             base / "queues" / "10-queues.yaml",
             queues(
@@ -490,7 +500,26 @@ def generate(tfvars: dict, out_dir: Path) -> dict:
             ),
         ),
     )
-    write(base / "queues" / "00-namespace.yaml", render("namespace", NAMESPACE=namespace))
+    # Under system/, which deploy_manifests.py applies before queues/: the
+    # namespace below names this class as its default, and a default that is not
+    # there yet is a namespace nothing can schedule into.
+    write(
+        base / "system" / "00-compute-class.yaml",
+        render("compute_class", NAME=MANAGER_COMPUTE_CLASS),
+    )
+    # Everything the fleet runs on the manager lives in this namespace, so
+    # setting the class here covers the launcher pods and the agent pods without
+    # either of their templates having to name a node. The controllers in
+    # kueue-system and jobset-system are upstream's and stay on plain
+    # auto-provisioning, which falls back across families of its own accord.
+    write(
+        base / "queues" / "00-namespace.yaml",
+        render(
+            "namespace",
+            NAMESPACE=namespace,
+            EXTRA_LABELS=f"\n    cloud.google.com/default-compute-class: {MANAGER_COMPUTE_CLASS}",
+        ),
+    )
     write(
         base / "queues" / "10-queues.yaml",
         queues(

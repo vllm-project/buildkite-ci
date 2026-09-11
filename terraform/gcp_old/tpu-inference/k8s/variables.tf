@@ -213,7 +213,7 @@ variable "allowed_image_repos" {
 
 variable "tpu_test_max_seconds" {
   type        = number
-  description = "How long a TPU workload may run once it has chips. The launcher puts it on the submitted workload as activeDeadlineSeconds, so a hung test releases the chips rather than holding them until the Buildkite step times out."
+  description = "How long a TPU workload runs for when it says nothing. The launcher puts it on the submitted workload as activeDeadlineSeconds, so a hung test releases the chips rather than holding them until the Buildkite step times out. A manifest that knows better states its own, bounded by tpu_total_max_seconds."
 }
 
 variable "tpu_total_max_seconds" {
@@ -221,8 +221,10 @@ variable "tpu_total_max_seconds" {
   description = <<-EOT
     How long a TPU step may take in total, queueing included.
 
-    The launcher waits for admission for whatever this leaves once a
-    full-length run is allowed for, so this and tpu_test_max_seconds are the
+    Also the ceiling on any deadline a manifest asks for, since the one thing
+    that must hold is that a workload does not outlast the launcher watching
+    it. The launcher waits for admission for whatever this leaves once the
+    workload's own run is allowed for, so this and tpu_test_max_seconds are the
     only deadlines worth choosing and every other one follows from them.
   EOT
 }

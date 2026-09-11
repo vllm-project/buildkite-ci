@@ -60,12 +60,13 @@ auth_plugin_source_path = "/usr/lib/google-cloud-sdk/bin/gke-gcloud-auth-plugin"
 # bytes.
 launcher_image = "us-central1-docker.pkg.dev/cloud-ullm-inference-ci-cd/tpu-ci/launcher:584.0.0-1"
 
-# A test may hold chips for three hours and a step may take eight in total,
-# queueing included; the launcher waits for admission for the difference. Both
-# match the bare-metal budgets, so a step moving between the two lanes gets the
-# same allowance.
+# A test gets three hours with the chips unless its manifest says otherwise,
+# matching the bare-metal budget so a step moving between the two lanes gets the
+# same allowance. Eleven in total is the ceiling on both the queueing and on
+# what a manifest may ask for, set by the longest workload the fleet runs: the
+# nightly P/D disaggregation benchmark, which serves for ten.
 tpu_test_max_seconds  = 10800
-tpu_total_max_seconds = 28800
+tpu_total_max_seconds = 39600
 
 # Every CI image this fleet runs is built into the manager project's Artifact
 # Registry, and a step names its own tag, so the project is the boundary rather

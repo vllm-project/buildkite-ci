@@ -22,9 +22,9 @@ one pod on one host, which is the same YAML every time, so the launcher ships
 that Job itself and a step gives only the hardware and the command. A step that
 needs another arrangement - roles that talk to each other, hosts of one slice -
 brings a manifest instead, and that manifest says everything: the hardware,
-because one JobSet can put prefill and decode on different shapes and no flag
-here could express that, and the commands, because a JobSet has one per role
-and no reading of one command line says which of them it replaces.
+because a JobSet can hold roles that want chips beside a client that wants none
+and no flag here could express that, and the commands, because a JobSet has one
+per role and no reading of one command line says which of them it replaces.
 
 So placement is read back out of the manifest rather than taken from a flag.
 That is also the only reading that can be checked: a shape the fleet has no
@@ -194,26 +194,36 @@ def pod_shape(spec):
 
 
 def resolve_shape(doc, registry, where):
-    """The profile the manifest's own pods describe.
+    """The profile the manifest's TPU pods describe.
 
     Read rather than passed in, so the hardware is written once. What follows
     from it - the queue, the deadline, the file cache size, the affinity that
     keeps Autopilot out - is cluster policy, and the manifest states none of it.
+
+    Only the roles holding chips decide it. A disaggregated workload is servers
+    plus a client that drives them over HTTP, and the client wants no
+    accelerator at all; the queues put google.com/tpu alone under quota, so a
+    role asking for none is admitted with the rest and scheduled wherever the
+    worker has room.
     """
     asked = {pod_shape(spec) for spec in pod_specs(doc)}
+    # Nothing of the three, rather than "no chips": a role that names an
+    # accelerator but forgets its limit has made a mistake, and falls through to
+    # the message below rather than being read as CPU-only and ignored.
+    asked.discard((None, None, None))
     if len(asked) > 1:
         raise SystemExit(
             f"{where}: names more than one shape "
             + "; ".join(sorted(f"{a} {t} x{c}" for a, t, c in asked))
             + ".\nA workload is admitted against one queue, and a queue is one "
-            "shape, so every pod in it has to ask for the same hardware."
+            "shape, so every pod holding chips has to ask for the same hardware."
         )
-    accelerator, topology, chips = asked.pop()
+    accelerator, topology, chips = asked.pop() if asked else (None, None, None)
     if not all((accelerator, topology, chips)):
         raise SystemExit(
-            f"{where}: does not say what hardware it needs. Every pod wants "
-            f"nodeSelector {ACCELERATOR_KEY} and {TOPOLOGY_KEY}, and a "
-            f"{TPU_RESOURCE} limit on the container holding the chips."
+            f"{where}: does not say what hardware it needs. A pod that holds "
+            f"chips wants nodeSelector {ACCELERATOR_KEY} and {TOPOLOGY_KEY}, "
+            f"and a {TPU_RESOURCE} limit on the container holding them."
         )
     for profile in registry.get("profiles", {}).values():
         if (profile["accelerator_label"] == accelerator
@@ -509,16 +519,23 @@ def state_node_affinity(doc):
     that exists, so stating an affinity prevents it. This one restates the
     manifest's nodeSelector rather than constraining anything further, which
     also keeps to the keys Autopilot permits in an affinity at all.
+
+    Per pod, because that is how Autopilot fills them in: a role that holds no
+    chips has no nodeSelector to restate, so it says the one thing that is true
+    of it instead - it is not for a TPU node - which the taint it does not
+    tolerate already ensured.
     """
     for spec in pod_specs(doc):
+        accelerator = spec.get("nodeSelector", {}).get(ACCELERATOR_KEY)
+        term = (
+            {"key": ACCELERATOR_KEY, "operator": "In", "values": [accelerator]}
+            if accelerator
+            else {"key": ACCELERATOR_KEY, "operator": "DoesNotExist"}
+        )
         affinity = spec.setdefault("affinity", {}).setdefault("nodeAffinity", {})
         affinity.setdefault(
             "requiredDuringSchedulingIgnoredDuringExecution",
-            {"nodeSelectorTerms": [{"matchExpressions": [{
-                "key": ACCELERATOR_KEY,
-                "operator": "In",
-                "values": [spec["nodeSelector"][ACCELERATOR_KEY]],
-            }]}]},
+            {"nodeSelectorTerms": [{"matchExpressions": [term]}]},
         )
 
 

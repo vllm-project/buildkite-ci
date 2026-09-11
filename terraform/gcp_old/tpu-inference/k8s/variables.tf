@@ -29,22 +29,22 @@ variable "manager_master_ipv4_cidr_block" {
   description = "RFC1918 /28 for the manager control plane. Must not overlap any worker cluster's block, because the manager peers with all of them."
 }
 
-variable "manager_system_machine_type" {
+variable "manager_bootstrap_machine_type" {
   type        = string
-  description = "Machine type for the manager's nodes. Sized for the controllers plus the launcher pods, which are a kubectl and a Python script and want cores rather than memory."
-  default     = "e2-standard-4"
+  description = "Machine type for the default node pool GKE insists on creating and that remove_default_node_pool then deletes. Nothing is ever scheduled on it; it is named only so that the create does not fail on whichever family is short in the region."
+  default     = "n2-standard-2"
 }
 
-variable "manager_system_min_nodes" {
+variable "manager_max_cpu" {
   type        = number
-  description = "Scale-down floor for the manager. Two, so a node under repair does not take the fleet's whole control plane with it."
-  default     = 2
+  description = "Ceiling on vCPUs auto-provisioning may create across the manager. Bounded by the Buildkite controller's in-flight limit rather than by any TPU quota: a launcher pod waiting for chips occupies a node without holding any."
+  default     = 128
 }
 
-variable "manager_system_max_nodes" {
+variable "manager_max_memory_gb" {
   type        = number
-  description = "Ceiling for the manager. Bounded by the Buildkite controller's in-flight limit rather than by any TPU quota: a launcher pod waiting for chips occupies a node without holding any."
-  default     = 8
+  description = "Ceiling on memory auto-provisioning may create across the manager. Generous against the CPU ceiling, so that the family fallback is free to land on a memory-heavy shape when the balanced ones are short."
+  default     = 512
 }
 
 variable "labels" {

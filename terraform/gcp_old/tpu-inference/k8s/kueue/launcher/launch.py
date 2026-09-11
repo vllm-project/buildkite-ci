@@ -270,7 +270,39 @@ def resolve_image(registry):
             f"image {image!r} is not from an allowed registry. Allowed prefixes: "
             + ", ".join(allowed)
         )
-    return image
+    return pin_digest(image)
+
+
+def pin_digest(image):
+    """Resolve a tag to the digest it points at right now.
+
+    A run is many pulls - a pod per role, and another on every restart - spread
+    over hours. A moving tag can be republished between two of them, which puts
+    two builds in one benchmark and invalidates a compile cache keyed on the
+    image. Resolving once, here, is what makes every pod in a workload the same
+    bytes.
+
+    Best effort: a tag that cannot be resolved is passed through, because the
+    registry being briefly unreachable is a worse reason to fail a step than an
+    unpinned pull is to run one.
+    """
+    if "@" in image:
+        return image
+    proc = subprocess.run(
+        ["gcloud", "artifacts", "docker", "images", "describe", image,
+         "--format=value(image_summary.digest)"],
+        capture_output=True, text=True,
+    )
+    digest = proc.stdout.strip()
+    if proc.returncode != 0 or not digest:
+        log(f"warning: could not resolve {image} to a digest; using the tag")
+        return image
+    # Strip the tag off the last path segment only: a colon earlier in the
+    # string is a registry port, not a tag separator.
+    head, sep, tail = image.rpartition("/")
+    pinned = f"{head}{sep}{tail.split(':', 1)[0]}@{digest}"
+    log(f"image {image} -> {pinned}")
+    return pinned
 
 
 def workload_name():

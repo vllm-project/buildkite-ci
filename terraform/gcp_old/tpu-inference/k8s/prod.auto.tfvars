@@ -17,6 +17,12 @@ agent_token_secret_id = "vllm_buildkite_agent_token"
 analytics_token_secret_project = "cloud-tpu-inference-test"
 analytics_token_secret_id      = "tpu_commons_buildkite_analytics_token"
 
+# The Hugging Face token, likewise the bare-metal agents' rather than one of
+# this fleet's: a gated model is gated per account, and the two lanes pull the
+# same weights into the same caches.
+hf_token_secret_project = "cloud-tpu-inference-test"
+hf_token_secret_id      = "bm-agent-hf-token"
+
 # us-central1 to sit with the rest of the CI control plane: the monitoring VM,
 # the cache buckets, and the Artifact Registry these nodes pull from. The
 # manager holds no TPUs, so it is not tied to a reservation's zone.

@@ -154,6 +154,19 @@ variable "hf_token_secret_id" {
   EOT
 }
 
+variable "git_ssh_key_secret_id" {
+  type        = string
+  description = <<-EOT
+    Secret Manager secret in project_id holding the SSH deploy key for the
+    private repositories this fleet builds.
+
+    Synced into the manager's namespace and read by the checkout container of
+    every agent pod; a public repository ignores it. Its algorithm is part of
+    the contract - see GIT_SSH_KEY_ENV in scripts/generate_manifests.py - so
+    replacing it with a key of another type is a change in two places.
+  EOT
+}
+
 variable "analytics_token_secret_id" {
   type        = string
   description = <<-EOT

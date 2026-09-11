@@ -26,3 +26,20 @@ config:
   # cluster from the agent token, which is why that token has to be a
   # cluster's and not the organization's.
   queue: kube
+
+  # The git SSH key, on every agent pod's checkout container. Controller-wide
+  # rather than per-pipeline `gitEnvFrom`, because which repositories are
+  # private is not something a pipeline should have to know: a public one
+  # ignores the key, so the cost of it being everywhere is nothing, and the
+  # alternative is a plugin stanza that only fails once a repository turns
+  # private.
+  #
+  # Only the checkout container. The command container runs the step, which on
+  # this fleet is a workload image named by a pull request, and a deploy key
+  # reaching that is a key a pull request can read.
+  pod-spec-patch:
+    containers:
+      - name: checkout
+        envFrom:
+          - secretRef:
+              name: git-ssh-credentials

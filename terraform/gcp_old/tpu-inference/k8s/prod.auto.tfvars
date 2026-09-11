@@ -112,10 +112,43 @@ worker_clusters = [
         # No floor: eight chips is too much of what is free to leave parked, so
         # this shape boots a node per job.
         min_nodes = 0
-        # One slice, which is what the disagg benchmark takes. Room for two more
-        # by borrowing whatever the single-chip queue is not using.
+        # One slice guaranteed, and room for two more by borrowing whatever the
+        # single-chip queue is not using.
         nominal_nodes = 1
         max_nodes     = 3
+      },
+    ]
+  },
+
+  # The v7x lane, in us-central1 because that is where its reservation is.
+  {
+    project                = "cloud-ullm-inference-ci-cd"
+    location               = "us-central1"
+    network                = "projects/cloud-ullm-inference-ci-cd/global/networks/default"
+    subnetwork             = "projects/cloud-ullm-inference-ci-cd/regions/us-central1/subnetworks/default"
+    master_ipv4_cidr_block = "172.16.0.64/28"
+
+    # Larger than the e2-standard-4 default, because a workload role that holds
+    # no chips lands here rather than on a TPU node - a benchmark client driving
+    # the engines over HTTP wants real cores to keep hundreds of streams fed.
+    system_machine_type = "e2-standard-16"
+
+    # Reservation cloudtpu-20251114223000-2002888989 in us-central1-c: 128 v7x
+    # chips, fully consumed, so the eight here are ones moved off an existing
+    # cluster rather than spare capacity.
+    tpu_node_pools = [
+      {
+        machine_type     = "tpu7x-standard-4t"
+        topology         = "2x2x1"
+        reservation_name = "cloudtpu-20251114223000-2002888989"
+        zone             = "us-central1-c"
+
+        # No floor, so the chips go back to the reservation once a pool goes
+        # idle. max and nominal are equal because there is nothing free in the
+        # reservation to borrow beyond them.
+        min_nodes     = 0
+        nominal_nodes = 2
+        max_nodes     = 2
       },
     ]
   },

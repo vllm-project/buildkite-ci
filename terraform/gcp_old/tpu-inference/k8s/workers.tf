@@ -8,30 +8,16 @@
 # that does is a TPU node, which must land in its reservation's zone, and each
 # TPU pool pins that for itself.
 
-# Worker nodes are private too, and Private Google Access is not enough on its
-# own: it resolves Google's endpoints, so Artifact Registry and the GKE system
-# images work without egress, but Kueue and JobSet are published on
-# registry.k8s.io and time out. Per region, because a Cloud Router is regional.
-resource "google_compute_router" "worker" {
-  for_each = local.workers
-
-  name    = "${var.name_prefix}-wkr-${each.value.short_name}-router"
-  project = each.value.project
-  region  = each.value.location
-  network = each.value.network
-}
-
-resource "google_compute_router_nat" "worker" {
-  for_each = local.workers
-
-  name                               = "${var.name_prefix}-wkr-${each.value.short_name}-nat"
-  project                            = each.value.project
-  region                             = each.value.location
-  router                             = google_compute_router.worker[each.key].name
-  nat_ip_allocate_option             = "AUTO_ONLY"
-  source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
-}
-
+# Egress is a prerequisite, not part of a cluster. Nodes here are private, and
+# Private Google Access only resolves Google's own endpoints - Artifact Registry
+# and the GKE system images work without egress, but Kueue and JobSet are
+# published on registry.k8s.io and time out - so every region a worker runs in
+# needs a Cloud Router and a Cloud NAT. Both are created outside this config,
+# once per region and network, because a NAT gateway covers every subnet range
+# in its region and a cluster does not own that: the manager's gateway already
+# serves us-central1, and a second one declared here for a worker in the same
+# region would be refused. See the README for what to create before adding a
+# region.
 resource "google_container_cluster" "worker" {
   for_each = local.workers
 
@@ -205,6 +191,18 @@ resource "google_container_node_pool" "worker_tpu" {
     # starting before the pull finishes is most of the cold start.
     gcfs_config {
       enabled = true
+    }
+
+    # A serving workload maps far more regions than the 65530 default allows -
+    # one per weight shard, per compiled executable and per KV buffer - and dies
+    # partway through model load without this. A property of the node, so it is
+    # set once here rather than by an init container in every manifest that
+    # needs it, which would have to be privileged and so would be refused by
+    # PodSecurity baseline on the workload namespace.
+    linux_node_config {
+      sysctls = {
+        "vm.max_map_count" = "8388608"
+      }
     }
 
     labels = {

@@ -95,6 +95,33 @@ can be linted and run; `deploy_manifests.py` builds the ConfigMap from it.
 
 ## Runbook
 
+### Before adding a region
+
+Terraform here owns clusters, not networking. A region needs a Cloud Router and
+a Cloud NAT before a private cluster in it can pull from registry.k8s.io, and
+neither is declared in this config: a NAT gateway covers every subnet range in
+its region and network, so it is shared by everything there rather than owned by
+one cluster, and a second gateway over ranges another already claims is refused
+at apply.
+
+They are named for the network and the region they serve — `default-us-central1-router`,
+`default-us-central1-nat` — and not for this fleet, which merely happens to be
+their first tenant.
+
+```bash
+gcloud compute routers create default-<region>-router \
+  --project cloud-ullm-inference-ci-cd --region <region> --network default
+gcloud compute routers nats create default-<region>-nat \
+  --project cloud-ullm-inference-ci-cd --region <region> --router default-<region>-router \
+  --auto-allocate-nat-external-ips --nat-all-subnet-ip-ranges
+```
+
+Check before creating: one may already be there for another tenant.
+
+```bash
+gcloud compute routers list --project cloud-ullm-inference-ci-cd
+```
+
 ### Add a TPU shape
 
 Add it to `tpu_node_pools` for the right cluster in `prod.auto.tfvars`, then

@@ -197,8 +197,8 @@ def resolve_shape(doc, registry, where):
     """The profile the manifest's TPU pods describe.
 
     Read rather than passed in, so the hardware is written once. What follows
-    from it - the queue, the deadline, the file cache size, the affinity that
-    keeps Autopilot out - is cluster policy, and the manifest states none of it.
+    from it - the queue, the deadline, the file cache size - is cluster policy,
+    and the manifest states none of it.
 
     Only the roles holding chips decide it. A disaggregated workload is servers
     plus a client that drives them over HTTP, and the client wants no
@@ -512,7 +512,6 @@ def finalise(doc, profile, registry, name, labels, owner, command, where):
 
     cap_runtime(doc, profile, registry)
     size_fuse_cache(doc, profile)
-    state_node_affinity(doc)
     return doc
 
 
@@ -553,39 +552,6 @@ def size_fuse_cache(doc, profile):
                 volume["emptyDir"].setdefault(
                     "sizeLimit", profile["fuse_cache_size"]
                 )
-
-
-def state_node_affinity(doc):
-    """Say where the pod runs, so that Autopilot does not say it instead.
-
-    The manager is Autopilot, and Autopilot fills in a nodeAffinity for any pod
-    that arrives without one: cloud.google.com/extended-duration-pods. No node
-    in a Standard worker carries that label, and MultiKueue copies the podspec
-    across unchanged, so the pod is unschedulable there with nothing reporting
-    an error - the step just waits out its timeout.
-
-    Autopilot adds one only where there is none, and does not merge into one
-    that exists, so stating an affinity prevents it. This one restates the
-    manifest's nodeSelector rather than constraining anything further, which
-    also keeps to the keys Autopilot permits in an affinity at all.
-
-    Per pod, because that is how Autopilot fills them in: a role that holds no
-    chips has no nodeSelector to restate, so it says the one thing that is true
-    of it instead - it is not for a TPU node - which the taint it does not
-    tolerate already ensured.
-    """
-    for spec in pod_specs(doc):
-        accelerator = spec.get("nodeSelector", {}).get(ACCELERATOR_KEY)
-        term = (
-            {"key": ACCELERATOR_KEY, "operator": "In", "values": [accelerator]}
-            if accelerator
-            else {"key": ACCELERATOR_KEY, "operator": "DoesNotExist"}
-        )
-        affinity = spec.setdefault("affinity", {}).setdefault("nodeAffinity", {})
-        affinity.setdefault(
-            "requiredDuringSchedulingIgnoredDuringExecution",
-            {"nodeSelectorTerms": [{"matchExpressions": [term]}]},
-        )
 
 
 # Fields the Kubernetes API declares as integers. A manifest is text with

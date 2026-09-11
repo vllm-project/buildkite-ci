@@ -119,6 +119,23 @@ variable "analytics_token_secret_project" {
   description = "Project holding the Buildkite Test Engine token. Not this one: it belongs to the suite, which predates this fleet and is shared with the bare-metal lane."
 }
 
+variable "hf_token_secret_project" {
+  type        = string
+  description = "Project holding the Hugging Face token. Not this one: it belongs to the bare-metal agents, and a gated model should be fetched under the same identity in both lanes."
+}
+
+variable "hf_token_secret_id" {
+  type        = string
+  description = <<-EOT
+    Secret Manager secret holding the Hugging Face token.
+
+    Read by the launcher pod and forwarded into the workload, since the pod
+    that downloads the weights is the only one that needs it.
+
+    Named rather than defaulted because the grant is scoped to this one secret.
+  EOT
+}
+
 variable "analytics_token_secret_id" {
   type        = string
   description = <<-EOT

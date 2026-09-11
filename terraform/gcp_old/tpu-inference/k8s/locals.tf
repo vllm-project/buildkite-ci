@@ -70,6 +70,10 @@ locals {
             is_multi_host = dims[0] * dims[1] * dims[2] > parseint(
               trimsuffix(reverse(split("-", pool.machine_type))[0], "t"), 10
             )
+
+            # Which kind of policy that is depends on the generation, so the
+            # family is carried rather than re-split at every use.
+            family = split("-", pool.machine_type)[0]
           })
         ]
       ]

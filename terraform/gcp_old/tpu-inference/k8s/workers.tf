@@ -1,6 +1,6 @@
 # Worker clusters: where the TPUs are. Standard, not Autopilot, because a TPU
 # node needs reservation affinity on a named reservation, the google.com/tpu
-# taint and COMPACT placement with an explicit topology - none of which
+# taint and a placement policy carrying an explicit topology - none of which
 # Autopilot lets through.
 #
 # The control plane is regional so that it survives a zone going away, and the
@@ -150,6 +150,35 @@ resource "google_container_node_pool" "worker_system" {
   }
 }
 
+# How a tpu7x slice is placed. Compute Engine will not build the node pool's
+# managed instance group around a compact placement policy for this machine
+# type - it says as much and points at a workload policy instead - so the policy
+# is created here and the pool names it. HIGH_THROUGHPUT is the colocating one:
+# the chips of a slice want the shortest hop between them.
+#
+# The accelerator topology on it is what makes it a slice rather than a hint,
+# and it is the same string that --tpu-topology carries for every earlier
+# generation. GKE reads it back out of the policy and labels the nodes with it.
+#
+# One policy per pool, not one per topology: it is regional and named, so a pool
+# that owns its own can be replaced without disturbing another that happens to
+# be the same shape.
+resource "google_compute_resource_policy" "tpu_slice" {
+  for_each = {
+    for key, pool in local.tpu_node_pools : key => pool
+    if pool.is_multi_host && pool.family == "tpu7x"
+  }
+
+  project = local.workers[each.value.worker].project
+  region  = local.workers[each.value.worker].location
+  name    = "${each.value.name}-slice"
+
+  workload_policy {
+    type                 = "HIGH_THROUGHPUT"
+    accelerator_topology = each.value.topology
+  }
+}
+
 # One pool per TPU shape. min_nodes is a scale-down floor, so a shape keeps
 # nodes it has already booted; GKE creates them only for a pending pod, never
 # to reach the floor. max_nodes exceeds this pool's share of the reservation,
@@ -240,12 +269,21 @@ resource "google_container_node_pool" "worker_tpu" {
     }
   }
 
-  # A slice wider than one VM needs its topology on a placement policy; GKE then
+  # A slice wider than one VM needs a policy that places it as a unit; GKE then
   # creates one node per host and scales the pool atomically.
+  #
+  # Which policy is the generation's business. Up to v6e, COMPACT asks GKE to
+  # make a compact placement policy of its own from the topology. tpu7x refuses
+  # one - Compute Engine will not build a managed instance group around a
+  # placement policy for that machine type - and takes a named workload policy
+  # instead, which is what google_compute_resource_policy.tpu_slice creates.
+  # GKE stores no type at all in that case, so stating one is a diff that would
+  # replace the pool on every apply.
   dynamic "placement_policy" {
     for_each = each.value.is_multi_host ? [1] : []
     content {
-      type         = "COMPACT"
+      type         = each.value.family == "tpu7x" ? "" : "COMPACT"
+      policy_name  = each.value.family == "tpu7x" ? google_compute_resource_policy.tpu_slice[each.key].name : null
       tpu_topology = each.value.topology
     }
   }

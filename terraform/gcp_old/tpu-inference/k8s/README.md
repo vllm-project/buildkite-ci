@@ -1,0 +1,222 @@
+# tpu-inference CI on GKE
+
+TPU steps for the `tpu-inference` suite, run as Kubernetes workloads instead of
+on long-lived agent VMs. A Buildkite step on queue `kube` becomes a Kueue
+workload, which is admitted against fleet quota on a manager cluster and
+dispatched to whichever worker cluster has the chips.
+
+Two clusters, and the split is the whole design:
+
+- **Manager** — `tpu-ci-manager`, Autopilot, `us-central1`. No TPUs. Runs the
+  agent-stack-k8s controller, the Buildkite agent pods, and the Kueue that owns
+  fleet-wide quota. This is where a step's agent lives and where its log goes.
+- **Worker** — `tpu-ci-us-east5`, Standard, `us-east5`. The chips. Reports to
+  the manager over Connect Gateway; runs no agent of its own.
+
+MultiKueue joins them: the manager admits, the worker executes. An operator
+talks to the manager for almost everything.
+
+## Layout
+
+| Path | What it is |
+| --- | --- |
+| `*.tf` | The clusters, node pools, buckets, IAM. Terraform owns infrastructure only. |
+| `prod.auto.tfvars` | The fleet. Cluster list, shapes, reservations, versions, timeouts. The single input to both Terraform and the generator. |
+| `scripts/generate_manifests.py` | Renders `kueue/generated/` from `prod.auto.tfvars`. |
+| `scripts/deploy_manifests.py` | Installs Kueue and JobSet, applies `kueue/generated/`. |
+| `kueue/templates/` | The templates the generator renders. |
+| `kueue/generated/` | The YAML that actually gets applied. Committed on purpose — see below. |
+| `kueue/launcher/` | The program every TPU step runs, its Job, and its image build. |
+
+Terraform stops at the cluster; `deploy_manifests.py` starts there. The
+Kubernetes and Helm providers need a reachable API server at plan time, which
+would make creating a cluster and configuring it two runs with a hand-edited
+variable in between.
+
+`kueue/generated/` is committed so that reviewing a quota change means reading
+the YAML that will be applied rather than inferring it from a template.
+`deploy_manifests.py` refuses to run if the committed tree differs from a fresh
+render, so it doubles as a drift detector.
+
+## Deploying a change
+
+```bash
+pip install -r scripts/requirements.txt
+
+terraform init && terraform apply          # if any *.tf or the shape list changed
+./scripts/generate_manifests.py            # if prod.auto.tfvars or a template changed
+./scripts/deploy_manifests.py              # diff, confirm, apply
+```
+
+`deploy_manifests.py --mode diff` shows what would change and stops;
+`--mode apply` skips the preview and the prompt. It walks the manager first so
+its queues exist before a worker reports to them, and it uses its own temporary
+kubeconfig, so it will not touch yours or leave a context selected.
+
+Always commit the regenerated `kueue/generated/` alongside whatever produced it.
+A change to a comment in a template counts: the comments are rendered into the
+ConfigMaps.
+
+## Running a step
+
+Every TPU step invokes one program. The common case is a single pod, and the
+step names the hardware:
+
+```yaml
+- label: "unit tests"
+  agents: { queue: kube }
+  command: launch --machine-type ct6e-standard-8t --topology 2x4 -- pytest tests/
+```
+
+Anything else — multi-host, disagg, more than one role — brings a manifest, and
+states its hardware inside it:
+
+```yaml
+  command: launch --manifest .buildkite/kubernetes/manifests/1p1d.yaml
+```
+
+and passes nothing else. Not the shape, because a JobSet already says where each
+of its pods runs and can put two roles on two different shapes, which no pair of
+flags can express. Not the command either — a JobSet has one per role. A
+manifest passed together with a command is refused rather than one role being
+silently chosen.
+
+A manifest must contain a container named `workload`: that is the one whose
+output is streamed back and which step environment is forwarded to. Everything
+that follows from the shape is the launcher's and is rejected in a manifest —
+the queue label, the `activeDeadlineSeconds` ceiling, the gcsfuse cache size.
+
+`kueue/launcher/launch.py` is the program. It is a file rather than YAML so it
+can be linted and run; `deploy_manifests.py` builds the ConfigMap from it.
+
+## Runbook
+
+### Add a TPU shape
+
+Add it to `tpu_node_pools` for the right cluster in `prod.auto.tfvars`, then
+`terraform apply`, `generate_manifests.py`, `deploy_manifests.py`. That creates
+the node pool, a ResourceFlavor, a ClusterQueue and a LocalQueue, and puts the
+shape in the profile registry the launcher matches against. Steps reach it by
+`--machine-type` / `--topology`; there is no new Buildkite queue.
+
+A machine type and a topology together identify a shape, and both are needed: a
+2x4 slice of v6e is eight chips either as one `ct6e-standard-8t` or as two
+`ct6e-standard-4t`, and which it is decides the host, the pod count and the
+quota.
+
+### Rotate the Buildkite agent token
+
+Add a new version to `vllm_buildkite_agent_token` in Secret Manager, then:
+
+```bash
+kubectl rollout restart deploy/agent-stack-k8s -n buildkite
+```
+
+SecretSync polls rather than watches, so the Kubernetes Secret catches up within
+about five minutes. **The restart is not optional**: the controller reads the
+token once at startup and holds it for the life of the process, so without it
+the fleet keeps using the old token until something else restarts the pod.
+
+This is the same secret the bare-metal agents register with. Rotating it affects
+both lanes.
+
+### Rebuild the launcher image
+
+Manual, by design — it changes only when the Cloud CLI version does.
+
+```bash
+cd kueue/launcher
+gcloud builds submit --project cloud-ullm-inference-ci-cd --region us-central1 \
+  --config cloudbuild.yaml \
+  --gcs-source-staging-dir gs://cloud-ullm-inference-ci-cd-tf-state/cloudbuild-source \
+  --substitutions _CLOUD_SDK_VERSION=584.0.0,_REVISION=1 .
+```
+
+Then point `launcher_image` in `prod.auto.tfvars` at the new tag and redeploy.
+Bump `_REVISION` when the Dockerfile changes without the base image changing, so
+a tag always names one set of bytes. The staging directory has to be named: the
+default is a multi-region `us` bucket, which `constraints/gcp.resourceLocations`
+refuses in this org.
+
+### Tear the fleet down
+
+**Empty the cache buckets first.** They are `force_destroy = false`, so a
+`terraform destroy` will fail on them rather than delete them — which is the
+intent. Rebuilding the caches from cold costs roughly 2.7x a suite's chips, so
+emptying them is a deliberate step and not something a destroy does on the way
+past.
+
+There are two per worker cluster — a compilation cache and a model cache — and
+their names carry a hash of the cluster's project and region, so list them
+rather than typing them:
+
+```bash
+terraform state list | grep google_storage_bucket.workload
+gcloud storage rm -r 'gs://tpu-ci-cache-*/**' 'gs://tpu-ci-models-*/**'
+terraform destroy
+```
+
+## Things that will surprise you
+
+**A deploy briefly rejects pod creation, cluster-wide.** Kueue's pod webhooks
+are `failurePolicy: Fail` and scoped to every namespace but `kube-system` and
+`kueue-system`, with no object selector. While `kueue-controller-manager` rolls,
+pod creation anywhere in the cluster fails. It is seconds, and it retries, but
+do not deploy into the middle of something that cannot tolerate it. JobSet's
+webhooks are also `Fail`, though those are narrowed to pods that already carry a
+JobSet label.
+
+**Autopilot writes a nodeAffinity into any podspec that lacks one** —
+`cloud.google.com/extended-duration-pods`. MultiKueue copies the podspec to the
+worker unchanged, no Standard node carries that label, and the pod is then
+unschedulable with nothing reporting an error: the step simply waits out its
+timeout. The launcher always states an affinity of its own to prevent it. If you
+write a podspec that reaches the worker by some other path, state one too.
+
+**A very short workload can lose its output.** MultiKueue deletes the remote Job
+when it completes and the pods go with it, so a workload that lives a few
+seconds can be created and removed between two log polls. The launcher polls
+faster before the first line arrives, which covers the built-in Job. The step
+still passes or fails correctly and says when output is missing; the container
+output is in Cloud Logging either way.
+
+**Not every controller setting is in our values.** The effective config is:
+
+```bash
+kubectl get cm agent-stack-k8s-config -n buildkite -o jsonpath='{.data.config\.yaml}'
+```
+
+`kueue/templates/agent_stack_values.yaml.tpl` sets only the queue and the Secret
+name; everything else in that output is a chart or controller default that we
+accept, including `job-ttl` and `max-in-flight`. Read it there rather than
+guessing — and note the chart pastes our block under keys of its own, so
+anything it derives must be left out of the template or the controller's decoder
+rejects the duplicate.
+
+## When a step is stuck
+
+Work down from admission. Everything here is on the manager unless it says
+otherwise.
+
+```bash
+# Is it admitted, and if not, why?
+kubectl get workloads -n buildkite
+kubectl describe workload -n buildkite <name>
+
+# Is there quota for the shape it asked for?
+kubectl get clusterqueue
+
+# Admitted but nothing running: it is on the worker.
+gcloud container clusters get-credentials tpu-ci-us-east5 \
+  --region us-east5 --project cloud-ullm-inference-ci-cd
+kubectl get pods -n buildkite
+```
+
+Admission only means the chips are reserved. The pod still has to be scheduled,
+the node possibly created from zero, and the image pulled — tens of minutes on a
+cold pool. The launcher reports where it is in that gap; a step sitting quietly
+at "waiting for a node" is usually the autoscaler, not a fault.
+
+A shape with no node pool is an error at submission that lists the shapes the
+fleet does have, rather than a workload queued forever against quota that does
+not exist.

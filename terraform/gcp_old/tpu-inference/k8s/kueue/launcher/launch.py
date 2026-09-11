@@ -349,9 +349,11 @@ def pod_metadatas(doc):
 def forward_env(doc, names):
     """Copy named step variables onto the workload container.
 
-    Named explicitly rather than forwarded wholesale: the launcher's own
-    environment holds the agent's per-job credentials, and none of that belongs
-    in a workload pod.
+    Named explicitly rather than forwarded wholesale. There is no allowlist -
+    the launcher's environment holds the agent's per-job credentials, and a step
+    that needs its workload to talk back to Buildkite may forward them - but it
+    has to say so, one name at a time, so what crosses into a workload pod is
+    written down in the step rather than inherited by default.
     """
     # Empty counts as unset: a step whose secret lookup came back with nothing
     # should fall through to the manifest, not overwrite a secretKeyRef with "".

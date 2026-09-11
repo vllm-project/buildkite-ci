@@ -80,6 +80,12 @@ of its pods runs, which no pair of flags can express. Not the command either —
 JobSet has one per role. A manifest passed together with a command is refused
 rather than one role being silently chosen.
 
+The image is `WORKLOAD_IMAGE` in the step's environment, checked against
+`allowed_image_repos` — a CI image is built per commit, so which one runs is the
+pipeline's choice, which in a public repo means a PR's. A tag is resolved to the
+digest it points at when the step submits, so every pod in the workload and
+every restart pull the same bytes even if the tag is republished mid-run.
+
 Every role that holds chips must ask for the same shape: a workload is admitted
 against one queue and a queue is one shape. A role that asks for no accelerator
 at all is the exception and rides along — a benchmark client driving the servers

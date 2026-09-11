@@ -97,3 +97,17 @@ resource "google_project_iam_member" "launcher_gateway" {
   role    = each.value
   member  = local.launcher_principal
 }
+
+# Read of the registry metadata, not of the layers: the launcher never pulls an
+# image, it asks which digest a tag currently points at so that every pod in a
+# workload is pinned to one set of bytes. The pull itself is the node service
+# accounts' above.
+resource "google_artifact_registry_repository_iam_member" "launcher" {
+  for_each = local.manager_repository_bindings
+
+  project    = var.project_id
+  location   = each.value.location
+  repository = each.value.repository
+  role       = "roles/artifactregistry.reader"
+  member     = local.launcher_principal
+}

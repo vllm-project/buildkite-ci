@@ -86,9 +86,18 @@ at all is the exception and rides along — a benchmark client driving the serve
 over HTTP, say — because the queues put `google.com/tpu` alone under quota.
 
 A manifest must contain a container named `workload`: that is the one whose
-output is streamed back and which step environment is forwarded to. Everything
-that follows from the shape is the launcher's and is rejected in a manifest —
-the queue label, the `activeDeadlineSeconds` ceiling, the gcsfuse cache size.
+output is streamed back and which step environment is forwarded to. More than
+one may carry the name, and in a JobSet whose roles all want the log and the
+step's secrets, they all should. Everything that follows from the shape is the
+launcher's and is rejected in a manifest — the queue label, the gcsfuse cache
+size.
+
+How long the workload runs is not one of those. It defaults to
+`tpu_test_max_seconds`, which is right for a test, and a manifest that knows
+better states its own `activeDeadlineSeconds` — a serving benchmark runs for as
+long as its client sweeps, which no shape implies. The ceiling is
+`tpu_total_max_seconds`: past that the workload would outlive the launcher
+watching it, and the chips would be held by nothing.
 
 `kueue/launcher/launch.py` is the program. It is a file rather than YAML so it
 can be linted and run; `deploy_manifests.py` builds the ConfigMap from it.

@@ -77,7 +77,7 @@ data:
     workload_service_accounts:
     - default
     - tpu-workload
-    total_max_seconds: 28800
+    total_max_seconds: 39600
     workers:
       tpu-ci-us-central1:
         membership: tpu-ci-us-central1

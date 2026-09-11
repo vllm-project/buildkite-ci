@@ -6,24 +6,9 @@
 # Autopilot is ForceNew: switching to Standard rebuilds the cluster and every
 # workload on it.
 
-# Nodes are private, so egress - image pulls, Buildkite's API, Secret Manager -
-# has to go through Cloud NAT.
-resource "google_compute_router" "manager" {
-  name    = "${var.name_prefix}-mgr-router"
-  project = var.project_id
-  region  = var.manager_region
-  network = var.network
-}
-
-resource "google_compute_router_nat" "manager" {
-  name                               = "${var.name_prefix}-mgr-nat"
-  project                            = var.project_id
-  region                             = var.manager_region
-  router                             = google_compute_router.manager.name
-  nat_ip_allocate_option             = "AUTO_ONLY"
-  source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
-}
-
+# Nodes here are private, so egress - image pulls, Buildkite's API, Secret
+# Manager - goes through the Cloud NAT covering this region. It is created
+# outside this config, with the rest of the networking; see workers.tf.
 resource "google_container_cluster" "manager" {
   project  = var.project_id
   name     = "${var.name_prefix}-manager"

@@ -79,6 +79,9 @@ data:
     - tpu-workload
     total_max_seconds: 28800
     workers:
+      tpu-ci-us-central1:
+        membership: tpu-ci-us-central1
+        project: cloud-ullm-inference-ci-cd
       tpu-ci-us-east5:
         membership: tpu-ci-us-east5
         project: cloud-ullm-inference-ci-cd
@@ -100,6 +103,15 @@ data:
         topology: 2x4
         accelerator_label: tpu-v6e-slice
         fuse_cache_size: 670Gi
+        max_runtime_seconds: 10800
+      tpu7x-standard-4t-2x2x1:
+        queue: tpu7x-standard-4t-2x2x1
+        machine_type: tpu7x-standard-4t
+        chips: 4
+        hosts: 1
+        topology: 2x2x1
+        accelerator_label: tpu7x
+        fuse_cache_size: 447Gi
         max_runtime_seconds: 10800
 ---
 # Referenced from a pipeline step as:

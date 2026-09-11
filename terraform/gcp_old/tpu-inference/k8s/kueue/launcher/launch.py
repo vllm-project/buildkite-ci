@@ -382,20 +382,24 @@ def render(path, image, name, shape):
             f"a Job or JobSet in the calling repo."
         )
 
-    # Required: supplied on every render, so a ${NAME} still unresolved after
+    # Required: supplied on every render, so a ${NAME} still unresolved once
     # these are applied is a typo, and substitute() raises rather than leaving
     # it as literal text.
     required = {"WORKLOAD_NAME": name, "IMAGE": image, **shape}
     # Optional: whatever the step exports, so a manifest can pin
-    # ${BUILDKITE_COMMIT} or a size its own pipeline sets. Absence is not an
-    # error here; safe_substitute leaves it for the required pass to judge.
+    # ${BUILDKITE_COMMIT} or a size its own pipeline sets.
     optional = {k: v for k, v in os.environ.items() if k not in required}
 
+    # One pass over the two merged, not a pass each. A manifest's containers are
+    # mostly shell, and shell is full of dollars that are not ours - $HOSTNAME,
+    # $(date), a loop variable. Substituting twice means the escape has to
+    # survive twice too: $$ collapses to $ in the first pass and is read as a
+    # placeholder in the second, so writing a single literal dollar took $$$$.
+    # Merged, the manifest keeps the ordinary convention - $$ is a literal $ -
+    # and the errors below are unchanged, since an unknown name still raises.
     try:
         doc = yaml.safe_load(
-            string.Template(
-                string.Template(open(path).read()).safe_substitute(optional)
-            ).substitute(required)
+            string.Template(open(path).read()).substitute({**optional, **required})
         )
     except KeyError as e:
         missing = e.args[0]

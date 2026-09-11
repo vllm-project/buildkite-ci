@@ -76,10 +76,14 @@ states its hardware inside it:
 ```
 
 and passes nothing else. Not the shape, because a JobSet already says where each
-of its pods runs and can put two roles on two different shapes, which no pair of
-flags can express. Not the command either — a JobSet has one per role. A
-manifest passed together with a command is refused rather than one role being
-silently chosen.
+of its pods runs, which no pair of flags can express. Not the command either — a
+JobSet has one per role. A manifest passed together with a command is refused
+rather than one role being silently chosen.
+
+Every role that holds chips must ask for the same shape: a workload is admitted
+against one queue and a queue is one shape. A role that asks for no accelerator
+at all is the exception and rides along — a benchmark client driving the servers
+over HTTP, say — because the queues put `google.com/tpu` alone under quota.
 
 A manifest must contain a container named `workload`: that is the one whose
 output is streamed back and which step environment is forwarded to. Everything

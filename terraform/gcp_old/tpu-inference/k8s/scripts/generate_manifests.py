@@ -319,6 +319,14 @@ def launcher_profiles(fleet: dict, workers: list[str], tfvars: dict) -> str:
                     "project": tfvars["hf_token_secret_project"],
                     "secret": tfvars["hf_token_secret_id"],
                 },
+                # Test Engine. The collector runs inside the workload, not in
+                # the agent, so the token has to reach the pod; without it a
+                # suite still passes and reports nothing, which is the failure
+                # mode worth designing against.
+                "BUILDKITE_ANALYTICS_TOKEN": {
+                    "project": tfvars["analytics_token_secret_project"],
+                    "secret": tfvars["analytics_token_secret_id"],
+                },
             },
             "total_max_seconds": int(tfvars["tpu_total_max_seconds"]),
             # How the launcher gets from an admitted workload to the pod logs.

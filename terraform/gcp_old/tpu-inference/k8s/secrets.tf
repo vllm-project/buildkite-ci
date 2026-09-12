@@ -60,3 +60,22 @@ resource "google_secret_manager_secret_iam_member" "launcher_hf_token" {
   role      = "roles/secretmanager.secretAccessor"
   member    = local.launcher_principal
 }
+
+# The GitHub deploy key, in this fleet's own project alongside the agent token.
+# A data source for the same reason that one is: a name that is wrong fails at
+# plan time rather than quietly creating an empty second secret.
+data "google_secret_manager_secret" "git_ssh_key" {
+  project   = var.project_id
+  secret_id = var.git_ssh_key_secret_id
+}
+
+# Granted to the sync rather than to the launcher, unlike the Hugging Face and
+# Test Engine tokens above: this one has to become a Kubernetes Secret, because
+# the thing that reads it is the agent's own checkout container and it takes the
+# key from its environment.
+resource "google_secret_manager_secret_iam_member" "git_ssh_key_sync" {
+  project   = var.project_id
+  secret_id = data.google_secret_manager_secret.git_ssh_key.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${var.project_id}.svc.id.goog[${var.namespace}/secret-sync]"
+}

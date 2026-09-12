@@ -22,7 +22,7 @@ from ci_selector.codemap.pipeline.targets import StepTargets
 from ci_selector.codemap.repo import ModuleIndex
 from ci_selector.codemap.state import PipelineData, detect_duplicate_ids
 from ci_selector.handwritten import DYNAMIC_IMPORT_FILES, ENGINE_ENTRY_MODULES
-from helpers import drift_message
+from helpers import PREFLIGHT_OWNER, drift_message, preflight_drift
 
 # The synthetic units still need a checkout root: preflight takes one. No
 # fallback: walking up from here lands on ci-infra, not vLLM. conftest validates
@@ -391,6 +391,41 @@ def test_container_test_is_reported_not_escalated():
     assert any("only inside their container image" in w for w in pf.warnings), (
         pf.warnings
     )
+
+
+def test_unlexable_line_is_reported_not_escalated():
+    """A pytest line the scanner cannot read comes from how we slice the
+    script, not from a stale path, so it warns instead of forcing the step. It
+    still has to reach `warnings`, or the drop is invisible in a real run."""
+    step = _step()
+    st = StepTargets(step_id=step.step_id)
+    st.add_target("tests/x", "pytest")
+    st.unlexable.append('pytest -k "slow tests/x')
+    pf = run_preflight(
+        REPO, [_pipe([step], {step.step_id: st})], _healthy_full(), LoadReport()
+    )
+    assert step.step_id not in pf.force_select
+    assert any("cannot read" in w for w in pf.warnings), pf.warnings
+    assert not pf.clean
+
+
+def test_preflight_drift_message_names_reason_and_owner(state):
+    """The failure every `quiet_preflight` test shows instead of a set diff.
+    Nothing exercises it while the suite is green -- force_select is empty at
+    HEAD -- so its formatting is only ever read on the day it fires, in
+    particular that `forced_by_reason` is reason -> count, not step -> reason."""
+    pf = PreflightReport(
+        force_select={
+            "p:a": "preflight: duplicate step id; target maps collided",
+            "p:b": "preflight: duplicate step id; target maps collided",
+            "p:c": "preflight: unknown step field 'commands_gpu' may gate execution",
+        }
+    )
+    message = preflight_drift(dataclasses.replace(state, preflight=pf))
+    assert "force-selected 3 step(s)" in message
+    assert "2x preflight: duplicate step id; target maps collided" in message
+    assert "1x preflight: unknown step field 'commands_gpu'" in message
+    assert PREFLIGHT_OWNER in message
 
 
 def test_force_select_applies_to_any_code_diff(state):

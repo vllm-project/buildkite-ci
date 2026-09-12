@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import ast
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -11,7 +12,9 @@ from ..handwritten import PACKAGE_ROOTS, SKIP_DIRS
 
 INSTALLABLE_TEST_ROOT = "tests/vllm_test_utils"
 INSTALLABLE_TEST_PARENT = "tests/plugins"
-PROJECT_MARKERS = ("setup.py", "pyproject.toml")
+SETUP_PY = "setup.py"
+PROJECT_MARKERS = (SETUP_PY, "pyproject.toml")
+EXTENSION_CALL_SUFFIX = "Extension"
 TEST_FILE_GLOB = "test_*.py"
 
 TESTS_ROOT = "tests"
@@ -72,6 +75,8 @@ class ModuleIndex:
     # file -> its pip-installable project dir; these load through entry points,
     # so no import edge reaches them
     installable_roots: dict[str, str] = field(default_factory=dict)
+    # Modules the build compiles; see native_extension_modules.
+    native_modules: frozenset[str] = frozenset()
 
     def resolve(self, name: str) -> str | None:
         return self.module_to_file.get(name)
@@ -81,8 +86,44 @@ class ModuleIndex:
         self.file_to_module[file] = module
 
 
+def native_extension_modules(repo: Path) -> frozenset[str]:
+    """Dotted module names setup.py builds as compiled extensions.
+
+    No .py file backs them, so a dynamic import naming one is resolved rather
+    than treated as missing. Any callee ending in `Extension` counts, so
+    CMakeExtension and CUDAExtension are read without listing class names.
+    """
+    try:
+        tree = ast.parse((repo / SETUP_PY).read_text())
+    except (SyntaxError, UnicodeDecodeError, OSError):
+        return frozenset()
+    modules: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        callee = (
+            func.id
+            if isinstance(func, ast.Name)
+            else func.attr
+            if isinstance(func, ast.Attribute)
+            else ""
+        )
+        if not callee.endswith(EXTENSION_CALL_SUFFIX):
+            continue
+        for keyword in node.keywords:
+            if (
+                keyword.arg == "name"
+                and isinstance(keyword.value, ast.Constant)
+                and isinstance(keyword.value.value, str)
+            ):
+                modules.add(keyword.value.value)
+    return frozenset(modules)
+
+
 def build_module_index(repo: Path) -> ModuleIndex:
     index = ModuleIndex()
+    index.native_modules = native_extension_modules(repo)
     for root in PACKAGE_ROOTS:
         base = repo / root
         if not base.is_dir():

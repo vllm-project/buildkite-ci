@@ -15,8 +15,9 @@ input that would quietly weaken selection surfaces here with a direction:
 - distrust the graph: an unmodeled dynamic import means the closure may be
   missing edges, so rules that trust the graph over a step's declared deps
   stand down until it is classified.
-- warn only: steps that legitimately have no targets, and steps whose tests
-  live inside their container image rather than in this checkout.
+- warn only: steps that legitimately have no targets, steps whose tests live
+  inside their container image rather than in this checkout, and steps with a
+  pytest line the script scanner cannot read.
 
 No step is exempt from being forced. A soft_fail step cannot gate the merge,
 but people still read its result, so it is forced like any other.
@@ -123,6 +124,7 @@ def run_preflight(repo: Path, pipelines, full, load_report) -> PreflightReport:
 
     zero_target: list[str] = []
     container_only: list[str] = []
+    unlexable: list[str] = []
     for pdata in pipelines:
         for step in pdata.steps:
             st = pdata.targets.get(step.step_id)
@@ -133,6 +135,8 @@ def run_preflight(repo: Path, pipelines, full, load_report) -> PreflightReport:
             # unreachable from here whatever else the step runs.
             if st.container_tests:
                 container_only.append(step.step_id)
+            if st.unlexable:
+                unlexable.append(step.step_id)
             if st.unparsable:
                 escalate(
                     step.step_id,
@@ -166,6 +170,13 @@ def run_preflight(repo: Path, pipelines, full, load_report) -> PreflightReport:
             f"preflight: {len(container_only)} steps name tests that exist only "
             "inside their container image, so this checkout cannot map them: "
             + ", ".join(sorted(container_only))
+        )
+    if unlexable:
+        # Warned, not escalated. See StepTargets.unlexable.
+        pf.warnings.append(
+            f"preflight: {len(unlexable)} steps run a pytest line the script "
+            "scanner cannot read, so the tests on it are unmapped: "
+            + ", ".join(sorted(unlexable))
         )
 
     if full.graph.parse_errors:

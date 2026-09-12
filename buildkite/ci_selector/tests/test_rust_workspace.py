@@ -7,6 +7,8 @@ the parse floor and the fail-open direction so a moved workspace reads as
 loud failure or as the widest RUST answer, not as the image union.
 """
 
+from pathlib import Path
+
 import pytest
 from ci_selector.codemap.rust_workspace import RustWorkspace
 
@@ -45,12 +47,57 @@ def test_mock_engine_feeds_no_artifact_but_stays_binary(ws):
     assert ws.bucket_of("rust/src/mock-engine/src/lib.rs") == "binary"
 
 
-def test_unknown_rust_path_fails_open_to_root_bucket(ws):
-    """A new crate the parser has not met takes the WIDEST rust answer, not the
-    image union, which would balloon the answer for exactly the files most
-    likely to hit the fail-open (new and moved members)."""
-    assert ws.bucket_of("rust/src/brand_new_crate/src/lib.rs") == "root"
-    assert ws.bucket_of("rust/proto/engine.proto") == "root"
+def _outside_every_member(ws: RustWorkspace, candidate: str) -> str:
+    """A crate directory the workspace does not know, derived from the ones it
+    does, so a crate joining the workspace moves the probe instead of breaking
+    the test. A candidate already inside a member cannot be lengthened out of
+    one, so that is a caller mistake."""
+    inside = sorted(m for m in ws.members if candidate.startswith(m + "/"))
+    assert not inside, f"{candidate} already lives inside {inside}"
+    while any(m == candidate or m.startswith(candidate + "/") for m in ws.members):
+        candidate += "x"
+    return candidate
+
+
+def _loose_rust_files(repo: Path, ws: RustWorkspace) -> list[str]:
+    """Real files under rust/ that no member contains. target/ is a build
+    tree rather than source, so it is pruned instead of walked."""
+    loose: list[str] = []
+    stack = [repo / "rust"]
+    while stack:
+        for p in sorted(stack.pop().iterdir()):
+            rel = p.relative_to(repo).as_posix()
+            if p.name.startswith(".") or p.name == "target":
+                continue
+            if any(rel == m or rel.startswith(m + "/") for m in ws.members):
+                continue
+            if p.is_dir():
+                stack.append(p)
+            else:
+                loose.append(rel)
+    return sorted(loose)
+
+
+def test_unknown_rust_path_fails_open_to_root_bucket(ws, vllm_repo):
+    """A rust path the parser cannot place takes the WIDEST rust answer, not
+    the image union, which would balloon the answer for the files most likely
+    to hit it. Three ways to be unplaceable, all derived: a crate directory no
+    member occupies, a sibling whose name extends the longest member's, and
+    the real files sitting above every crate."""
+    new_crate = _outside_every_member(ws, "rust/src/brand_new_crate")
+    assert ws.bucket_of(f"{new_crate}/src/lib.rs") == "root"
+
+    # The longest-prefix boundary: bucket_of matching on the bare member name
+    # instead of member + "/" would silently bucket this as that member, and
+    # the longest one is the one such a match would win with.
+    longest = max(ws.members, key=len)
+    sibling = _outside_every_member(ws, f"{longest}-sibling")
+    assert ws.bucket_of(f"{sibling}/src/lib.rs") == "root"
+
+    loose = _loose_rust_files(vllm_repo, ws)
+    assert len(loose) >= 2, f"only {loose} sit above the crates; the walk moved"
+    for rel in loose:
+        assert ws.bucket_of(rel) == "root", rel
 
 
 def test_nested_member_longest_prefix(ws):

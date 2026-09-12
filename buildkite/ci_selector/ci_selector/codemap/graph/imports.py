@@ -29,6 +29,7 @@ PYTHON_GLOB = "*.py"
 LAZY_LOADER_MODULE_ARG = 2  # LazyLoader(name, globals(), module)
 LITERAL_MIN_LEN = 3  # shorter is noise ("py", "id")
 LITERAL_MAX_LEN = 120  # longer is prose or a command line
+MAX_MODULE_CANDIDATES = 32  # wider than this is for a person to read
 
 
 def routable_literal(value: object) -> bool:
@@ -668,23 +669,12 @@ def _resolve_call(
     elif isinstance(func, ast.Attribute):
         name = func.attr
     if name == LAZY_LOADER_CLASS:
-        _resolve_lazy_loader(node, index, graph, file, consts)
+        _resolve_lazy_loader(node, index, graph, file, consts, options or {})
         return
     if name not in DYNAMIC_IMPORT_FUNCS or not node.args:
         return
-    target_name = _module_string(node.args[0], consts)
-    if target_name is None:
-        arg = node.args[0]
-        choices = (options or {}).get(arg.id, ()) if isinstance(arg, ast.Name) else ()
-        if not choices:
-            graph.dynamic_sites.append(DynamicSite(file, node.lineno, name))
-            return
-        # The decorator lists every value, so all of them is the whole dispatch.
-        for choice in sorted(choices):
-            _link_module(choice, index, graph, file, node.lineno, name, False)
-        return
-    _link_module(
-        target_name,
+    _link_modules(
+        _module_strings(node.args[0], consts, options or {}),
         index,
         graph,
         file,
@@ -700,6 +690,7 @@ def _resolve_lazy_loader(
     graph: ImportGraph,
     file: str,
     consts: dict[str, str],
+    options: dict[str, set[str]],
 ) -> None:
     """LazyLoader defers an import to first attribute access, but the file
     holding it is still the consumer, so it gets the edge like any import.
@@ -707,25 +698,54 @@ def _resolve_lazy_loader(
     if len(node.args) <= LAZY_LOADER_MODULE_ARG:
         graph.dynamic_sites.append(DynamicSite(file, node.lineno, LAZY_LOADER_CLASS))
         return
-    target_name = _module_string(node.args[LAZY_LOADER_MODULE_ARG], consts)
-    if target_name is None:
-        graph.dynamic_sites.append(DynamicSite(file, node.lineno, LAZY_LOADER_CLASS))
-        return
-    _link_module(target_name, index, graph, file, node.lineno, LAZY_LOADER_CLASS, False)
+    _link_modules(
+        _module_strings(node.args[LAZY_LOADER_MODULE_ARG], consts, options),
+        index,
+        graph,
+        file,
+        node.lineno,
+        LAZY_LOADER_CLASS,
+    )
 
 
-def _module_string(arg: ast.expr, consts: dict[str, str]) -> str | None:
-    """The module an import names, when we can read it: a literal, a name bound
-    to one, or an f-string whose every hole is one of those."""
+def _name_candidates(
+    name: str, consts: dict[str, str], options: dict[str, set[str]]
+) -> set[str] | None:
+    """Everything a bare name can be: the constant it is bound to, the values
+    pytest parametrizes it with, or both. Both, because either one alone can
+    miss a real target and taking both only ever widens."""
+    candidates = set(options.get(name, ()))
+    const = consts.get(name)
+    if const is not None:
+        candidates.add(const)
+    return candidates or None
+
+
+def _capped(names: set[str] | None) -> set[str] | None:
+    """Give up on a dispatch too wide to list. Linking too much is usually the
+    safe direction, but a huge fan-out from one call site is better read by a
+    person than linked."""
+    if names is None or len(names) > MAX_MODULE_CANDIDATES:
+        return None
+    return names
+
+
+def _module_strings(
+    arg: ast.expr, consts: dict[str, str], options: dict[str, set[str]]
+) -> set[str] | None:
+    """Every module name an import argument can name, or None when we cannot
+    read it: a literal is one name, a bare name is whatever it is bound to or
+    parametrized with, an f-string is every combination of its parts. None is
+    the only way to give up, so the caller records a DynamicSite."""
     if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
-        return arg.value
+        return {arg.value}
     if isinstance(arg, ast.Name):
-        return consts.get(arg.id)
+        return _capped(_name_candidates(arg.id, consts, options))
     if isinstance(arg, ast.JoinedStr):
-        parts: list[str] = []
+        names = {""}
         for piece in arg.values:
             if isinstance(piece, ast.Constant) and isinstance(piece.value, str):
-                parts.append(piece.value)
+                names = {n + piece.value for n in names}
                 continue
             # A conversion or format spec rewrites the value.
             if (
@@ -734,35 +754,63 @@ def _module_string(arg: ast.expr, consts: dict[str, str]) -> str | None:
                 or piece.format_spec is not None
             ):
                 return None
-            filled = _module_string(piece.value, consts)
-            if filled is None:
+            fills = _module_strings(piece.value, consts, options)
+            if fills is None:
                 return None
-            parts.append(filled)
-        return "".join(parts)
+            # Same cap as `_capped`, but checked before the combinations are
+            # built rather than after.
+            if len(names) * len(fills) > MAX_MODULE_CANDIDATES:
+                return None
+            names = {n + fill for n in names for fill in fills}
+        return names
     return None
 
 
-def _link_module(
-    target_name: str,
+def _link_modules(
+    targets: set[str] | None,
     index: ModuleIndex,
     graph: ImportGraph,
     file: str,
     lineno: int,
     func: str,
-    parent_fallback: bool,
+    parent_fallback: bool = False,
 ) -> None:
+    """Every candidate really runs on some parametrize row, so each is resolved
+    on its own and one that misses still counts as missed. Reported once per
+    call site, however many missed."""
+    if targets is None:
+        graph.dynamic_sites.append(DynamicSite(file, lineno, func))
+        return
+    # Built as a list, not short-circuited, so every candidate gets its edge.
+    linked = [
+        _resolve_module(target, index, graph, file, parent_fallback)
+        for target in sorted(targets)
+    ]
+    if not all(linked):
+        graph.dynamic_sites.append(DynamicSite(file, lineno, func))
+
+
+def _resolve_module(
+    target_name: str,
+    index: ModuleIndex,
+    graph: ImportGraph,
+    file: str,
+    parent_fallback: bool,
+) -> bool:
+    """Edge for one candidate module name. False means it sits under one of our
+    own roots but names nothing."""
     resolved = index.resolve(target_name)
     if resolved is None and parent_fallback and "." in target_name:
         resolved = index.resolve(target_name.rsplit(".", 1)[0])
     if resolved:
         graph.add_edge(file, resolved)
-        return
-    # Nothing resolved. A top-level package that is not one of ours proves the
-    # import leaves the repo, so there is no edge to miss and nothing to flag.
-    # A package that IS ours means the path is broken or moved -- a real hole,
-    # and it used to disappear here without a word.
-    if target_name.split(".", 1)[0] in PACKAGE_ROOTS:
-        graph.dynamic_sites.append(DynamicSite(file, lineno, func))
+        return True
+    # setup.py compiles it, so no .py can back it and there is no edge to miss.
+    if target_name in index.native_modules:
+        return True
+    # A package that is not ours means the import leaves the repo, so there is
+    # no edge to miss. One that is ours means the path moved or broke.
+    return target_name.split(".", 1)[0] not in PACKAGE_ROOTS
 
 
 def _add_examples_nodes(repo: Path, index: ModuleIndex, graph: ImportGraph) -> None:

@@ -56,6 +56,27 @@ def _isolate_worktree_cache(tmp_path_factory):
         wt.WORKTREE_CACHE = original
 
 
+@pytest.fixture(autouse=True)
+def _quiet_preflight(request):
+    """Fail a `quiet_preflight` test with the preflight problem itself.
+
+    A force-selected step joins every selection, so one unreadable command
+    fails a dozen unrelated rules with a set diff naming a step they never
+    mention. Autouse so it always runs before the select() call, and
+    marker-gated so no other test builds a state for it.
+
+    It does not subtract the forced steps from the selection: that would hide
+    a real over-selection that happened to land on one.
+    """
+    if request.node.get_closest_marker("quiet_preflight") is None:
+        return
+    from helpers import preflight_drift
+
+    state = request.getfixturevalue("state")
+    if state.preflight.force_select:
+        pytest.fail(preflight_drift(state), pytrace=False)
+
+
 @pytest.fixture(scope="session")
 def vllm_repo() -> Path:
     """The real vLLM checkout. Named so it cannot be confused with the

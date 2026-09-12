@@ -15,6 +15,7 @@ from pathlib import Path
 import regex as re
 
 from ..handwritten import RELEASE_PIPELINE_FILES
+from .shell import join_continuations
 
 DOCKER_DIR = "docker"
 DOCKERFILE_GLOB = "Dockerfile*"
@@ -55,7 +56,7 @@ def release_pipeline_refs(repo: Path) -> frozenset[str]:
 def _copy_sources(text: str) -> list[str]:
     """Sources of every COPY/ADD, minus `--from=` stage copies, whose sources
     are image paths and not repo files."""
-    joined = text.replace("\\\n", " ")
+    joined = join_continuations(text)
     out: list[str] = []
     for raw in joined.splitlines():
         line = raw.strip()

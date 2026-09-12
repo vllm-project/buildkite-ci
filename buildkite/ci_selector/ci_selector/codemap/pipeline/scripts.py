@@ -5,14 +5,17 @@ already knows: pytest lines, python drivers, nested bash, and cd. The rest of a
 script is docker and setup logic and is skipped.
 
 Only scripts a step actually invokes are read, so a script nothing runs cannot
-invent targets. Giving up is always recorded as a dangling target, never a
-quiet return, or a script we could not read would make the tests it runs look
-like nothing runs them.
+invent targets. Giving up is always recorded and shown by preflight, never a
+quiet return, or the tests those lines run would look like nothing runs them.
 """
 
 from __future__ import annotations
 
+import shlex
+
 import regex as re
+
+from ..shell import join_continuations
 
 # Exactly the deepest `bash x.sh` chain in the tree, no headroom. A new
 # nesting level records a dangling target, which preflight force-selects.
@@ -30,6 +33,9 @@ SEP_RE = re.compile(r"&&|\|\||;")
 CONTAINER_PAYLOAD_RE = re.compile(
     r"\b(?:docker|podman|nerdctl)\s+(?:run|exec|create)\b[\s\S]*?-c\s*([\"'])([\s\S]*?)\1"
 )
+# Cut at separators, pipes and redirects, or a trailing `&& bash next.sh`
+# reads as a pytest positional.
+ARG_CUT_RE = re.compile(r"&&|;|\||2>|>")
 
 
 def scan_script(script: str, parser, depth: int = 0) -> None:
@@ -46,11 +52,13 @@ def scan_script(script: str, parser, depth: int = 0) -> None:
     except (UnicodeDecodeError, OSError):
         parser.out.dangling.append(script)
         return
+    # Raw text, not joined: key matching reads words, not commands.
     parser.out.haystack += "\n" + text
     saved_cwd = parser.cwd
-    payloads = [m.span() for m in CONTAINER_PAYLOAD_RE.finditer(text)]
+    joined = join_continuations(text)
+    payloads = [m.span() for m in CONTAINER_PAYLOAD_RE.finditer(joined)]
     offset = 0
-    for raw in text.splitlines(keepends=True):
+    for raw in joined.splitlines(keepends=True):
         start, offset = offset, offset + len(raw)
         in_container = any(lo <= start < hi for lo, hi in payloads)
         line = raw.strip()
@@ -65,8 +73,10 @@ def scan_script(script: str, parser, depth: int = 0) -> None:
             m = PYTEST_LINE_RE.search(segment)
             if m:
                 args = _tokenize(m.group(1))
-                if args is not None:
-                    parser.parse_pytest(args, via=script, container=in_container)
+                if args is None:
+                    parser.out.unlexable.append(segment)
+                    continue
+                parser.parse_pytest(args, via=script, container=in_container)
         for token in SH_PATH_RE.findall(line):
             nested = parser.resolve_path(token)
             if nested is None:
@@ -88,12 +98,16 @@ def scan_script(script: str, parser, depth: int = 0) -> None:
 
 
 def _tokenize(argstr: str) -> list[str] | None:
-    import shlex
-
-    # Cut at separators, pipes and redirects, or a trailing `&& bash next.sh`
-    # reads as a pytest positional.
-    argstr = re.split(r"&&|;|\||2>|>", argstr)[0].rstrip("\\ ")
+    argstr = ARG_CUT_RE.split(argstr)[0].rstrip()
     try:
         return shlex.split(argstr)
+    except ValueError as exc:
+        if "quotation" not in str(exc) or not argstr.endswith(("'", '"')):
+            return None
+    # The last pytest line of a `bash -c "..."` payload carries the payload's
+    # own closing quote, so our slice holds one quote too many. Drop it and
+    # retry; anything still unreadable stays recorded.
+    try:
+        return shlex.split(argstr[:-1])
     except ValueError:
         return None

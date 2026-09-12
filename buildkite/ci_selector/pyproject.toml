@@ -28,4 +28,5 @@ packages = ["ci_selector"]
 testpaths = ["tests"]
 markers = [
     "drift: fails when vLLM moved under us, or the generator beside us did, not when our code is wrong. The fix is usually editing handwritten.py or teaching a parser; for a value we re-export, it is editing the generator's own amd.py.",
+    "quiet_preflight: a rule that asserts its file selects nothing beyond the always-run steps, so any preflight-forced step fails it for a reason it is not about. Fails with the forced steps and why, instead of a set diff.",
 ]

@@ -4,11 +4,35 @@
 matching) + matcher units."""
 
 import pytest
-from helpers import drift_message
+import regex as re
+from helpers import always_run_ids, drift_message, steps_by_id
 
 
 def _steps_for(state, key):
     return {sid for sid, ks in state.keys.step_keys.items() if key in ks}
+
+
+def _flag_key_contexts(state, flag: str) -> dict[str, set[str]]:
+    """step_id -> the registered parser names `flag` passes in that step.
+
+    The premise side of the typed matcher, read off the same text it reads.
+    Every live context arrives through a step's config data_files, so the
+    command-haystack arm has no end-to-end pin -- recorded, not asserted,
+    since asserting it would fail today.
+
+    A copy of the matcher's pattern rather than a call to it, so the premise
+    and the assertion are not the same code. It fails in one direction only:
+    if the matcher stops keying a context this still finds, the test goes red,
+    but a context shape this pattern misses never enters the set.
+    """
+    pattern = re.compile(re.escape(flag) + r"[\"']?[ =:]+[\"']?([\w.-]+)")
+    parsers = set(state.full.factories.parser_entries)
+    found: dict[str, set[str]] = {}
+    for sid, text in state.keys.searchable.items():
+        named = set(pattern.findall(text)) & parsers
+        if named:
+            found[sid] = named
+    return found
 
 
 def test_register_key_value_contexts_pinned(state):
@@ -20,21 +44,61 @@ def test_register_key_value_contexts_pinned(state):
 
 
 def test_parser_key_flag_contexts_pinned(state):
-    """Premise on the raw searchable text (the flag context still exists),
-    assertion on the matcher output."""
-    k = state.keys
-    sid = "vllm_ci::nvidia: (H200 MIG 35GB) MRCR Eval Small Models"
-    assert "--reasoning-parser qwen3" in k.searchable[sid], (
-        "MRCR eval no longer pins qwen3 by flag: update specimen"
-    )
-    assert "qwen3" in k.step_keys[sid]
+    """Premise on the raw searchable text (a flag context still exists),
+    assertion on the matcher output.
 
-    # A second flag, so the two specimens cover both rather than one twice.
-    sid = "vllm_ci:lm-eval-spec-decode-4xb200"
-    assert "--tool-call-parser kimi_k3" in k.searchable[sid], (
-        "spec-decode eval no longer pins kimi_k3 by flag: update specimen"
+    Existential over every live flag, naming no specimen. The jobs that used
+    to be named only ever covered the flag, which this covers whole.
+    """
+    from ci_selector.codemap.registered_names import PARSER_SELECTING_FLAGS
+
+    live = {
+        flag: found
+        for flag in PARSER_SELECTING_FLAGS
+        if (found := _flag_key_contexts(state, flag))
+    }
+    # Two, not all of them: the snake_case spellings match config and env
+    # contexts, and no step passes a parser that way.
+    assert len(live) >= 2, drift_message(
+        f"only {len(live)} of {len(PARSER_SELECTING_FLAGS)} parser-selecting "
+        "flags still pass a registered parser anywhere in CI",
+        "a flag context is how a job command routes to the parser file it "
+        "names; below two live flags this stops proving the typed matcher "
+        "extracts anything at all, and the jobs quietly fall back to broader "
+        "matching",
+        "if vLLM renamed the flags, PARSER_SELECTING_FLAGS in "
+        "codemap/registered_names.py is what to update",
+        "if the eval jobs stopped passing a parser by flag, the typed parser "
+        "arm has no live user and the mechanism is what to question",
     )
-    assert "kimi_k3" in k.step_keys[sid]
+    pairs = {
+        (sid, key)
+        for found in live.values()
+        for sid, named in found.items()
+        for key in named
+    }
+    # Mirrors re-run their parent's command text, so they are the same context
+    # counted twice; the jobs are the evidence.
+    by_id = steps_by_id(state)
+    jobs = {sid for sid, _ in pairs if not by_id[sid].mirror_hw}
+    assert len(jobs) >= 2, drift_message(
+        f"the {len(pairs)} live flag contexts come from {len(jobs)} distinct "
+        f"job(s): {sorted(jobs)}",
+        "the flag count cannot see this: one job passing three flags keeps "
+        "three of them live by itself, so the existential can come to rest on "
+        "a single eval config without the floor moving -- and then one "
+        "relabel or one dropped argument takes the typed arm's whole "
+        "end-to-end evidence with it",
+        "if the eval fleet really is down to one job, this stops being an "
+        "existential over the flag dimension: pin that job by name and say "
+        "what it proves, or retire the case",
+        "if the eval jobs stopped passing a parser by flag, the typed parser "
+        "arm has no live user and the mechanism is what to question",
+    )
+    for flag, found in sorted(live.items()):
+        for sid, named in sorted(found.items()):
+            missing = named - state.keys.step_keys.get(sid, set())
+            assert not missing, f"{sid} passes {flag} {sorted(missing)}, unkeyed"
 
 
 @pytest.mark.drift
@@ -221,7 +285,7 @@ def test_key_routing_is_belt_over_graph_coverage(state):
     bare = dataclasses.replace(state, keys=bare_keys)
     sel = select(bare, ["vllm/tool_parsers/granite_tool_parser.py"])
     assert not sel.run_all
-    always = {s.step_id for p in state.pipelines for s in p.steps if s.always_runs}
+    always = always_run_ids(state)
     assert set(sel.selected) - always, "graph channel must still select"
 
 

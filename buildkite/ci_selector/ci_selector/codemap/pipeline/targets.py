@@ -27,6 +27,7 @@ from ...handwritten import (
     UNWRAP_CMDS,
     UNWRAP_VALUE_FLAGS,
 )
+from ..shell import command_lines, join_continuations
 from .step import Step
 
 VAR_PREFIX_RE = re.compile(r"^\"?\$\{?\w+\}?\"?/")
@@ -64,6 +65,10 @@ class StepTargets:
     # Reported, never escalated: an image-only path and a renamed one look the
     # same here, and escalating both runs the step on every PR.
     container_tests: list[str] = field(default_factory=list)
+    # pytest lines in a script whose argv would not lex. Warned in preflight,
+    # never escalated: these come from how we slice the script, not from a
+    # command we cannot run.
+    unlexable: list[str] = field(default_factory=list)
     scripts_seen: list[str] = field(default_factory=list)
     # The step's commands plus every script body it reaches. Registered keys
     # are matched here, because a job can pick a backend by name in argv
@@ -106,6 +111,9 @@ class CommandParser:
         return self.out
 
     def _process_command(self, command: str) -> None:
+        # Joined before the check below, not just before the line loop, or an
+        # unquoted continuation looks like a quoted block argument.
+        command = join_continuations(command)
         try:
             tokens = shlex.split(command, comments=True)
         except ValueError:
@@ -114,10 +122,7 @@ class CommandParser:
             # One invocation carrying a quoted multi-line block argument.
             self._process_segment(tokens, command)
             return
-        for line in command.splitlines():
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
+        for line in command_lines(command):
             self._process_line(line)
 
     def _process_line(self, line: str) -> None:
@@ -345,10 +350,8 @@ class CommandParser:
         resolve_path falls back to the repo root anyway, so both root-relative
         and step-relative blocks resolve."""
         saved = self.cwd
-        for line in block.splitlines():
-            line = line.strip()
-            if line and not line.startswith("#"):
-                self._process_line(line)
+        for line in command_lines(block):
+            self._process_line(line)
         self.cwd = saved
 
     def _expand_glob(self, token: str) -> list[str]:

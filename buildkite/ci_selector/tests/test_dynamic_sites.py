@@ -186,8 +186,202 @@ def test_lazy_loader_targets_get_an_edge(full):
 
 
 def test_lazy_loader_external_targets_stay_silent(full):
-    """Most LazyLoader targets are heavy third-party packages (torch,
-    llguidance). Those resolve to nothing by proof, so they must not turn into
-    unclassified sites and fail the check."""
+    """Most LazyLoader targets are third-party packages, which resolve to
+    nothing and must not become unclassified sites."""
     sites = [s for s in full.graph.dynamic_sites if s.func == "LazyLoader"]
     assert sites == [], [(s.file, s.lineno) for s in sites]
+
+
+TEST_FILE = "tests/test_dispatch.py"
+
+_DISPATCH = (
+    "import pytest\n"
+    "from importlib import import_module\n"
+    "\n"
+    '@pytest.mark.parametrize("backend", ["amd", "nvidia", "xpu"])\n'
+    "def test_mtp(backend):\n"
+    '    import_module(f"vllm.models.{backend}.mtp")\n'
+)
+_BACKEND_MODULES = (
+    "vllm.models.amd.mtp",
+    "vllm.models.nvidia.mtp",
+    "vllm.models.xpu.mtp",
+)
+
+
+def _mini_dispatch_repo(root, source, *, modules=(), setup_py=None):
+    """One test file doing a dynamic import, beside the vllm modules it can
+    name. Omitting `setup_py` leaves no setup.py at all."""
+    from ci_selector.codemap.graph.imports import build_graph
+    from ci_selector.codemap.repo import build_module_index
+
+    (root / "vllm").mkdir(parents=True)
+    (root / "vllm/__init__.py").write_text("")
+    for module in modules:
+        path = root / (module.replace(".", "/") + ".py")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("")
+    (root / "tests").mkdir()
+    (root / TEST_FILE).write_text(source)
+    if setup_py is not None:
+        (root / "setup.py").write_text(setup_py)
+    return build_graph(root, build_module_index(root))
+
+
+def _line_of(source: str, needle: str) -> int:
+    return next(i for i, line in enumerate(source.splitlines(), 1) if needle in line)
+
+
+def _call_line(source: str) -> int:
+    return _line_of(source, "import_module(")
+
+
+def test_fstring_over_parametrize_links_every_option(tmp_path):
+    """The decorator names every backend the import runs under, so each is a
+    real edge."""
+    graph = _mini_dispatch_repo(tmp_path, _DISPATCH, modules=_BACKEND_MODULES)
+    assert graph.imports[TEST_FILE] == {
+        "vllm/models/amd/mtp.py",
+        "vllm/models/nvidia/mtp.py",
+        "vllm/models/xpu/mtp.py",
+    }
+    assert graph.dynamic_sites == []
+
+
+def test_partial_resolve_keeps_the_edge_and_reports_once(tmp_path):
+    """Every candidate really runs, so the ones naming nothing still count as
+    missed even though another resolved. Reported once per call site."""
+    graph = _mini_dispatch_repo(tmp_path, _DISPATCH, modules=_BACKEND_MODULES[:1])
+    assert graph.imports[TEST_FILE] == {"vllm/models/amd/mtp.py"}
+    assert [(s.file, s.lineno, s.func) for s in graph.dynamic_sites] == [
+        (TEST_FILE, _call_line(_DISPATCH), "import_module")
+    ]
+
+
+def test_product_over_the_cap_falls_back_to_a_site(tmp_path):
+    """A dispatch too wide to list gives up loudly, where truncating it would
+    drop real edges in silence."""
+    from ci_selector.codemap.graph.imports import MAX_MODULE_CANDIDATES
+
+    side = int(MAX_MODULE_CANDIDATES**0.5) + 1
+    values = [f"v{i}" for i in range(side)]
+    source = (
+        "import pytest\n"
+        "from importlib import import_module\n"
+        "\n"
+        f'@pytest.mark.parametrize("major", {values!r})\n'
+        f'@pytest.mark.parametrize("minor", {values!r})\n'
+        "def test_wide(major, minor):\n"
+        '    import_module(f"vllm.models.{major}.{minor}")\n'
+    )
+    # Every target exists, so an uncapped expansion would link them all.
+    graph = _mini_dispatch_repo(
+        tmp_path,
+        source,
+        modules=[f"vllm.models.{a}.{b}" for a in values for b in values],
+    )
+    assert graph.imports.get(TEST_FILE, set()) == set()
+    assert len(graph.dynamic_sites) == 1
+
+
+def test_bare_name_over_the_cap_falls_back_to_a_site(tmp_path):
+    """The cap belongs to the call site, not to f-strings, so a bare name has
+    to give up exactly where an f-string does."""
+    from ci_selector.codemap.graph.imports import MAX_MODULE_CANDIDATES
+
+    modules = [f"vllm.models.m{i}" for i in range(MAX_MODULE_CANDIDATES + 1)]
+    source = (
+        "import pytest\n"
+        "from importlib import import_module\n"
+        "\n"
+        f'@pytest.mark.parametrize("mod", {modules!r})\n'
+        "def test_wide(mod):\n"
+        "    import_module(mod)\n"
+    )
+    graph = _mini_dispatch_repo(tmp_path, source, modules=modules)
+    assert graph.imports.get(TEST_FILE, set()) == set()
+    assert len(graph.dynamic_sites) == 1
+
+
+def test_fstring_leaving_the_repo_stays_silent(tmp_path):
+    """A package outside the repo has no edge to miss, however many
+    candidates it expands to."""
+    source = (
+        "import pytest\n"
+        "from importlib import import_module\n"
+        "\n"
+        '@pytest.mark.parametrize("sub", ["nn", "fx"])\n'
+        "def test_torch(sub):\n"
+        '    import_module(f"torch.{sub}")\n'
+    )
+    graph = _mini_dispatch_repo(tmp_path, source)
+    assert graph.imports.get(TEST_FILE, set()) == set()
+    assert graph.dynamic_sites == []
+
+
+def test_bare_parametrized_name_still_expands(tmp_path):
+    """A bare name is the base case of the f-string path, and links as it
+    always did."""
+    options = list(_BACKEND_MODULES[:2])
+    source = (
+        "import pytest\n"
+        "from importlib import import_module\n"
+        "\n"
+        f'@pytest.mark.parametrize("mod", {options!r})\n'
+        "def test_mtp(mod):\n"
+        "    import_module(mod)\n"
+    )
+    graph = _mini_dispatch_repo(tmp_path, source, modules=_BACKEND_MODULES[:2])
+    assert graph.imports[TEST_FILE] == {
+        "vllm/models/amd/mtp.py",
+        "vllm/models/nvidia/mtp.py",
+    }
+    assert graph.dynamic_sites == []
+
+
+def test_a_name_in_both_tables_yields_both():
+    """Either table alone can miss a target the other one names, so both are
+    read."""
+    import ast
+
+    from ci_selector.codemap.graph.imports import _module_strings
+
+    arg = ast.parse("name").body[0].value
+    assert _module_strings(arg, {"name": "vllm.a"}, {"name": {"vllm.b"}}) == {
+        "vllm.a",
+        "vllm.b",
+    }
+    assert _module_strings(arg, {}, {}) is None
+
+
+def test_compiled_extension_resolves_only_while_setup_py_builds_it(tmp_path):
+    """`vllm._moe_C_stable_libtorch` is a CMake target; no .py can ever back
+    it, so it is resolved rather than a hole. Two neighbours in the same file
+    keep the two legs from being satisfied by a blanket "bless anything under
+    vllm that will not resolve": a name setup.py never declares still reports,
+    and an ordinary module still gets its edge. That edge is the only one
+    assertable here, since a compiled target has no file to point at."""
+    source = (
+        "import importlib\n"
+        "\n"
+        "def _available():\n"
+        '    importlib.import_module("vllm._moe_C_stable_libtorch")\n'
+        '    importlib.import_module("vllm._never_built_C")\n'
+        '    importlib.import_module("vllm.models.amd.mtp")\n'
+    )
+    declared = (
+        'ext_modules.append(CMakeExtension(name="vllm._moe_C_stable_libtorch"))\n'
+    )
+    undeclared = _line_of(source, "vllm._never_built_C")
+    compiled = _line_of(source, "vllm._moe_C_stable_libtorch")
+    for case, (setup_py, expect_sites) in enumerate(
+        ((declared, [undeclared]), ("ext_modules = []\n", [compiled, undeclared]))
+    ):
+        graph = _mini_dispatch_repo(
+            tmp_path / str(case),
+            source,
+            modules=["vllm.models.amd.mtp"],
+            setup_py=setup_py,
+        )
+        assert graph.imports.get(TEST_FILE, set()) == {"vllm/models/amd/mtp.py"}
+        assert sorted(s.lineno for s in graph.dynamic_sites) == expect_sites, setup_py

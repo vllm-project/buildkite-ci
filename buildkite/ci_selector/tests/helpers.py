@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
-"""Shared test helpers: the drift-failure message, and the derivations behind
-the subtractive invariants in test_demote.py.
+"""Shared test helpers: the drift-failure message, step addressing, and the
+derivations behind the subtractive invariants in test_demote.py.
 
 Claims and demotions both delete graph edges on purpose, and each deletion is
 sound only if the coverage it carried arrives another way. These work out
@@ -18,8 +18,10 @@ from ci_selector.codemap.graph.demote import (
     CONFIG_KEY_MAX_TEST_FILES,
     leaf_literal_fanout,
 )
+from ci_selector.codemap.pipeline.step import Step
 from ci_selector.codemap.repo import is_test_basename
 from ci_selector.codemap.state import RepoState
+from ci_selector.codemap.step_refs import _source_dep_steps_ungated
 
 
 def leaf_origin_drops(state: RepoState) -> list[tuple[str, str]]:
@@ -130,3 +132,50 @@ def drift_message(what: str, cost: str, *fixes: str) -> str:
     """
     head = "Fix:" if len(fixes) == 1 else "Fix one of:"
     return "\n".join(["", what, "", cost, "", head, *(f"  - {f}" for f in fixes), ""])
+
+
+# ---- step addressing -------------------------------------------------------
+# A step id is `key or label`, and vLLM owns both, so relabelling or keying a
+# step rewrites ids here without changing anything the tests assert. Address
+# steps by what they do.
+
+
+def always_run_ids(state: RepoState) -> set[str]:
+    """Steps select() injects on every diff, whatever the rules decided.
+    Subtracted wherever a test means "this file selected nothing of its own"."""
+    return {s.step_id for p in state.pipelines for s in p.steps if s.always_runs}
+
+
+def steps_by_id(state: RepoState) -> dict[str, Step]:
+    return {s.step_id: s for p in state.pipelines for s in p.steps}
+
+
+def declaring_steps(
+    state: RepoState, path: str, *, auto_only: bool = False
+) -> set[str]:
+    """Steps naming `path` in their source_file_dependencies.
+
+    Ungated on purpose: these tests check the derived path still reaches the
+    steps the declarations name, and the gate defaults to off, so the gated
+    call would return nothing and make the assertion pass for free.
+    """
+    steps = _source_dep_steps_ungated(state, path)
+    return steps & state.auto_step_ids if auto_only else steps
+
+
+# The test that owns a dirty preflight, so the message points there rather than
+# at whichever rule tripped over it first.
+PREFLIGHT_OWNER = "tests/test_guards.py::test_preflight_clean_at_head"
+
+
+def preflight_drift(state: RepoState) -> str:
+    """The failure a `quiet_preflight` test gets instead of a set diff."""
+    pf = state.preflight
+    reasons = "; ".join(f"{n}x {why}" for why, n in pf.forced_by_reason.items())
+    return drift_message(
+        f"preflight force-selected {len(pf.force_select)} step(s): {reasons}",
+        "a forced step joins every selection whatever the diff says, so a rule "
+        "asserting its file selects nothing of its own fails on a step it is "
+        "not about",
+        f"{PREFLIGHT_OWNER} owns this condition and names the stale input",
+    )

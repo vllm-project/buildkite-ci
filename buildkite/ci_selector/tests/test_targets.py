@@ -2,10 +2,12 @@
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 """Command-shape contract, and what a step really invokes, vs. the real checkout."""
 
+import shlex
+
 import pytest
 from ci_selector.codemap.pipeline.buildkite import load_pipeline_configs, load_steps
 from ci_selector.codemap.pipeline.invoked_tests import invoked_files
-from ci_selector.codemap.pipeline.scripts import scan_script
+from ci_selector.codemap.pipeline.scripts import ARG_CUT_RE, PYTEST_LINE_RE, scan_script
 from ci_selector.codemap.pipeline.step import LoadReport
 from ci_selector.codemap.pipeline.targets import map_step
 
@@ -193,3 +195,96 @@ def test_docker_compose_wrapped_test_unparsable(vllm_repo):
     ):
         st = _map(vllm_repo, cmd)
         assert st.unparsable and not st.targets, cmd
+
+
+def test_continuation_block_keeps_every_shard_path(vllm_repo):
+    """A sharded pytest inside a quoted argv block, one path per continued
+    line. Written out here so it survives upstream rewriting the yaml."""
+    st = _map(
+        vllm_repo,
+        'bash .buildkite/scripts/hardware_ci/run-cpu-test.sh 30m "\n'
+        "pytest -x -v -s --num-shards=$$COUNT --shard-id=$$JOB \\\n"
+        "tests/lora/test_llama_tp.py \\\n"
+        'tests/kernels/test_onednn.py::TestOneDNN"\n',
+    )
+    assert [t.path for t in st.targets] == [
+        "tests/lora/test_llama_tp.py",
+        "tests/kernels/test_onednn.py",
+    ]
+    assert not st.unparsable and not st.dangling
+    assert any("run-cpu-test.sh" in s for s in st.scripts_seen)
+
+
+def test_top_level_continuation_is_one_command(vllm_repo):
+    """An unquoted continuation used to read as a quoted block argument and
+    mark the step dangling."""
+    st = _map(vllm_repo, "pytest -v \\\n  lora/test_llama_tp.py")
+    assert [t.path for t in st.targets] == ["tests/lora/test_llama_tp.py"]
+    assert not st.unparsable and not st.dangling
+
+
+def test_script_pytest_keeps_continued_arguments(tmp_path):
+    """A pytest in a shell script with its paths on continuation lines."""
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_a.py").write_text("def test_a(): pass\n")
+    (tmp_path / "tests" / "test_b.py").write_text("def test_b(): pass\n")
+    (tmp_path / "run.sh").write_text(
+        "pytest -x \\\n  tests/test_a.py \\\n  tests/test_b.py\n"
+    )
+    st = map_step(tmp_path, _wrap_step(["bash run.sh"]), script_scanner=scan_script)
+    assert sorted(t.path for t in st.targets) == [
+        "tests/test_a.py",
+        "tests/test_b.py",
+    ]
+    assert not st.dangling and not st.unlexable
+
+
+def _lex_failure(entry: str) -> str:
+    """Why shlex refused the argv of an unlexable entry, re-derived from it."""
+    args = ARG_CUT_RE.split(PYTEST_LINE_RE.search(entry).group(1))[0].rstrip()
+    try:
+        shlex.split(args)
+    except ValueError as exc:
+        return str(exc)
+    return "lexed cleanly"
+
+
+def test_unlexable_entries_are_quoting_artifacts(mapped):
+    """What survives the trailing-quote recovery is still a quote our own line
+    slicing opened and did not close; a "No escaped character" would mean
+    continuations stopped being joined, which is a parse defect rather than a
+    slicing one. Floorless on purpose: empty is the ideal state for this
+    bucket, and a floor would keep a defect alive to satisfy it."""
+    _, _, by_id = mapped
+    for st in by_id.values():
+        for entry in st.unlexable:
+            assert "quotation" in _lex_failure(entry), (st.step_id, entry)
+
+
+def test_trailing_payload_quote_is_recovered(tmp_path):
+    """The last pytest line of a `bash -c "..."` payload carries the payload's
+    own closing quote, so the sliced segment holds one quote too many. Three
+    real arm-cpu-test targets were dropped there without a target or an
+    escalation to show for it."""
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_a.py").write_text("def test_a(): pass\n")
+    (tmp_path / "run.sh").write_text(
+        'docker exec ci bash -c "\n'
+        "  set -e\n"
+        "  pytest -x -v -s tests/test_a.py\n"
+        '  pytest -x -v -s tests/test_a.py::test_a"\n'
+    )
+    st = map_step(tmp_path, _wrap_step(["bash run.sh"]), script_scanner=scan_script)
+    assert [t.path for t in st.targets] == ["tests/test_a.py"] * 2
+    assert not st.unlexable and not st.dangling
+
+
+def test_genuinely_unbalanced_quote_still_recorded(tmp_path):
+    """The retry drops one trailing quote, not any quote, so a line that never
+    closes its quote stays unlexable."""
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_a.py").write_text("def test_a(): pass\n")
+    (tmp_path / "run.sh").write_text('pytest -k "slow tests/test_a.py\n')
+    st = map_step(tmp_path, _wrap_step(["bash run.sh"]), script_scanner=scan_script)
+    assert not st.targets
+    assert st.unlexable == ['pytest -k "slow tests/test_a.py']

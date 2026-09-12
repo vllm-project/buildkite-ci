@@ -10,10 +10,7 @@ exists only at runtime is pinned by the mistral case below.
 """
 
 from ci_selector.codemap.classify import colocation_routes, select
-
-
-def _auto_steps(state):
-    return {s.step_id for p in state.pipelines for s in p.steps if not s.manual_only}
+from helpers import drift_message
 
 
 def _static_importer_tests(state, target):
@@ -80,9 +77,8 @@ def test_engine_set_derived_and_claimed(state):
 def test_static_floor_no_under_selection(state):
     """The load-bearing seal: for every engine, every AUTO step running a test
     that statically imports it survives the tightened selection."""
-    auto = _auto_steps(state)
     for module in sorted(state.full.factories.parser_engine_entries.values()):
-        floor = _steps_running(state, _floor_tests(state, module)) & auto
+        floor = _steps_running(state, _floor_tests(state, module)) & state.auto_step_ids
         sel = select(state, [module])
         assert not sel.run_all, module
         missing = floor - set(sel.selected)
@@ -90,17 +86,38 @@ def test_static_floor_no_under_selection(state):
 
 
 def test_mistral_tightened_but_keeps_parser_coverage(state):
-    """mistral has zero static importers, so its coverage is entirely stem-keyed.
-    It must drop below the 252 hub blanket yet keep every mistral-parser-test step,
-    including model-generation, whose test_mistral.py constructs MistralToolParser."""
-    sel = select(state, ["vllm/parser/mistral.py"])
+    """The other half of the check above: mistral coverage that no import edge
+    holds up.
+
+    mistral does have static importers, and those are already asserted by
+    `test_static_floor_no_under_selection`. What is unguarded is the rest:
+    tests that reach the parser only by naming it at runtime, so nothing in
+    the graph keeps them alive when the engine claim drops its lazy edges.
+    Derive them as the mistral-named tests the static floor does not already
+    reach, and require every auto step running one to survive.
+    """
+    stem = "mistral"
+    module = state.full.factories.parser_engine_entries[stem]
+    # A directory named for the engine is where its suites live. A path
+    # substring instead swept in model tests that never touch the parser.
+    named = {f for f in state.catalog if stem in f.split("/")}
+    runtime_only = named - _static_importer_tests(state, module)
+    floor = _steps_running(state, runtime_only) & state.auto_step_ids
+    assert len(floor) >= 3, drift_message(
+        f"the {len(runtime_only)} runtime-only {stem} tests reach "
+        f"{len(floor)} auto step(s)",
+        "runtime-only coverage is the half a tightening can drop silently, "
+        "since no import edge keeps it alive; the steps running it are what "
+        "has to survive, and a count of FILES could not see them go -- parser "
+        "tests growing module-level imports, or being deleted, left unrelated "
+        "files holding the count up while nothing parser-shaped was pinned",
+        "if the parser suites moved out of tests/parser/<stem>/ and "
+        "tests/tool_use/<stem>/, point the name probe where they live now",
+        "if they grew module-level imports of the parser the static floor now "
+        "covers them, and the seal moved rather than broke",
+    )
+    sel = select(state, [module])
     assert not sel.run_all
     selected = set(sel.selected)
     assert len(selected) < 120, len(selected)  # was 252 (near-run-all)
-    for step in (
-        "vllm_ci::nvidia: (H200 MIG 35GB) Rust Frontend Tool Use",
-        "vllm_ci:entrypoints-integration-api-server-generate",
-        "vllm_ci:async-engine-inputs-utils-worker-config-cpu",
-        "vllm_ci:language-models-tests-standard",
-    ):
-        assert step in selected, step
+    assert floor <= selected, sorted(floor - selected)

@@ -19,6 +19,7 @@ from ci_selector.codemap.step_refs import (
     _source_dep_steps_ungated,
     mode,
 )
+from helpers import drift_message, steps_by_id
 
 PKG = Path(ci_selector.__file__).parent
 
@@ -121,9 +122,54 @@ def test_rust_files_keep_the_cargo_suite_without_declarations(state, monkeypatch
     assert cargo <= claim.step_ids
 
 
+def _docker_build_text(state) -> str:
+    """Everything the image builds actually run, concatenated."""
+    return "\n".join(
+        f.read_text(errors="ignore")
+        for f in sorted((state.repo / "docker").rglob("*"))
+        if f.is_file()
+    )
+
+
+def _steps_matched_by_target_literals(
+    state, keys: set[str], build_text: str
+) -> dict[str, set[tuple[str, str]]]:
+    """step_id -> the (target file, string literal) pairs naming one of `keys`.
+
+    A step's own pytest targets feed `searchable`, so a test asserting on a
+    command string reaches the raw-key leg the way a command does. That makes
+    this a fourth way to reach a step, beside cargo, the gate env vars and the
+    always-run floor, rather than an exemption from them.
+
+    The literal has to be one the image builds really run. Matching the key
+    anywhere would excuse any step whose target merely names a toolchain file
+    in a docstring or a skip reason.
+    """
+    literals = state.full.graph.string_literals
+    evidence: dict[str, set[tuple[str, str]]] = {}
+    for p in state.pipelines:
+        for sid, st in p.targets.items():
+            for t in st.targets:
+                if not t.path.endswith(".py"):
+                    continue
+                for lit in literals.get(t.path, ()):
+                    if lit not in build_text:
+                        continue
+                    for key in keys:
+                        if key in lit:
+                            evidence.setdefault(sid, set()).add((t.path, lit))
+    return evidence
+
+
 def test_rust_reference_leg_over_match_floor(state):
     """The leg reaches the cargo suite plus steps that run anyway; anything
-    else is an over-match to inspect."""
+    else is an over-match to inspect.
+
+    A total partition, so every step in the leg is either explained by a named
+    mechanism or reported. The explanations print their evidence: an id list
+    said which steps were excused without saying why, and went stale the moment
+    vLLM re-keyed them.
+    """
     from ci_selector.handwritten import RUST_GATE_ENV_VARS, RUST_TOOLCHAIN_FILES
 
     leg = (
@@ -132,20 +178,31 @@ def test_rust_reference_leg_over_match_floor(state):
     )
     cargo = _cargo_suite(state)
     assert cargo <= leg
-    steps_by_id = {s.step_id: s for p in state.pipelines for s in p.steps}
     gate = state.keys.steps_naming_raw(set(RUST_GATE_ENV_VARS))
-    # These declare docker/Dockerfile, which runs build_rust.sh, so a rust
-    # change really does reach them. Named, so a different stray still shows.
-    via_dockerfile = {
-        "vllm_ci::computer: (CPU) Docker Build Metadata",
-        # The mirror is addressed by its minted key, not its label: a keyless
-        # parent still gives its mirror a real key, the way the generator does.
-        "vllm_ci:-computer--cpu-docker-build-metadata-amd:amd",
+    # The docker build-metadata steps land here because their own pytest target
+    # asserts on `bash build_rust.sh`, which the Dockerfile really runs, so a
+    # rust change really does reach them.
+    by_test = _steps_matched_by_target_literals(
+        state, set(RUST_TOOLCHAIN_FILES), _docker_build_text(state)
+    )
+    assert len(by_test) <= 4, drift_message(
+        f"{len(by_test)} steps are excused by a target literal: {sorted(by_test)}",
+        "every excused step is one this partition stops inspecting; the "
+        "exemption is meant for the docker build-metadata pair, and growing "
+        "unwatched it absorbs the very over-matches the case exists to report",
+        "if another build-metadata job is real, raise the bound and name it",
+        "if ordinary suites started matching through their targets, the "
+        "raw-key leg widened -- fix that rather than the bound",
+    )
+    by_id = steps_by_id(state)
+    unexplained = {
+        s for s in leg - cargo - gate - set(by_test) if not by_id[s].always_runs
     }
-    stray = {
-        s for s in leg - cargo - gate - via_dockerfile if not steps_by_id[s].always_runs
-    }
-    assert not stray, f"rust reference leg over-matches: {sorted(stray)}"
+    explained = "; ".join(f"{s}: {sorted(ev)}" for s, ev in sorted(by_test.items()))
+    assert not unexplained, (
+        f"rust reference leg over-matches: {sorted(unexplained)}\n"
+        f"explained by a target literal: {explained}"
+    )
 
 
 def test_untargeted_example_asset_routes_by_workdir_affinity(state, monkeypatch):

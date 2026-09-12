@@ -104,7 +104,7 @@ class RustWorkspace:
             if path.startswith(mdir + "/") and len(mdir) > len(best):
                 best = mdir
         if not best:
-            return "root"  # workspace files, proto/, a crate we never parsed
+            return "root"  # workspace files, a crate we never parsed
         if best in self.cdylib_crates:
             return "cdylib"
         if best in self.binary_crates:

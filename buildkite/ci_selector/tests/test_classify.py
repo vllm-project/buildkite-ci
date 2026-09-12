@@ -10,7 +10,7 @@ from ci_selector.codemap.claim import matches_source_dependency
 from ci_selector.codemap.classify import select
 from ci_selector.gitdiff import DiffFile, changed_paths
 from ci_selector.validate.generator_replica import today_select
-from helpers import HW, drift_message
+from helpers import HW, always_run_ids, declaring_steps, drift_message, steps_by_id
 
 
 def _selected(sel, pipeline="vllm_ci"):
@@ -20,7 +20,7 @@ def _selected(sel, pipeline="vllm_ci"):
 def _non_always(sel, state, pipeline="vllm_ci"):
     """Selected steps minus the always-run floor (image-build/AMD-base steps
     select() injects), for 'selects nothing but the floor' cases."""
-    always = {s.step_id for p in state.pipelines for s in p.steps if s.always_runs}
+    always = always_run_ids(state)
     return {s for s in _selected(sel, pipeline) if s not in always}
 
 
@@ -488,6 +488,7 @@ def test_catch_all_declarers_omitted_on_graph_known_leaf(state, declared_deps_on
     )
 
 
+@pytest.mark.quiet_preflight
 def test_legacy_test_amd_yaml_selects_nothing(state):
     """test-amd.yaml is in no ci_config job_dirs (retired external AMD
     pipeline); an edit to it must not trigger a conservative run-all."""
@@ -685,7 +686,7 @@ def test_no_rule_above_graph_swallows_a_closure_routed_hub(state):
     """
     from ci_selector.codemap.classify import _source_dep_steps
 
-    always_run = {s.step_id for p in state.pipelines for s in p.steps if s.always_runs}
+    always_run = always_run_ids(state)
     for path in CLOSURE_HUBS:
         claim = _closure_hub_guards(state, path)
         sel = select(state, [path])
@@ -965,6 +966,7 @@ def test_plugin_package_file_selects_plugin_step(state, vllm_repo):
     assert any("plugin" in s for s in _selected(sel))
 
 
+@pytest.mark.quiet_preflight
 def test_orphan_test_file_selects_nothing(state):
     """An orphan test file no step declares runs nowhere: zero jobs with a claim, not
     run-all. A declared orphan differs (see
@@ -981,7 +983,7 @@ def test_orphan_test_file_selects_nothing(state):
     sel = select(state, [path])
     assert not sel.run_all
     assert "orphan" in sel.claims[0].detail
-    always = {s.step_id for p in state.pipelines for s in p.steps if s.always_runs}
+    always = always_run_ids(state)
     assert set(sel.selected) <= always
 
 
@@ -1032,12 +1034,13 @@ def test_boot_edge_reaches_conftest_server_suites(state, declared_deps_on):
     assert any("metrics-tracing" in s for s in _selected(sel))
 
 
+@pytest.mark.quiet_preflight
 def test_tpu_platform_no_hardware_rule(state):
     """tpu has zero live CI steps and tpu.py is import-isolated: nothing to run."""
     sel = select(state, ["vllm/platforms/tpu.py"])
     assert sel.claims[0].rule == "no-hardware"
     assert not sel.run_all
-    always = {s.step_id for p in state.pipelines for s in p.steps if s.always_runs}
+    always = always_run_ids(state)
     assert set(sel.selected) <= always
 
 
@@ -1203,6 +1206,7 @@ def test_inert_tree_referenced_by_live_step_claims_steps(state):
     assert sid in claim.step_ids
 
 
+@pytest.mark.quiet_preflight
 def test_a_step_yaml_selects_only_the_steps_it_defines(state):
     """A step yaml selects the steps it defines and nothing else: the generator
     reads it on the agent before any container starts, so no job in an image it
@@ -1216,7 +1220,7 @@ def test_a_step_yaml_selects_only_the_steps_it_defines(state):
     # Every pipeline, not `_non_always`, which sees vllm_ci only: the image
     # union added rocm and intel steps too, so a vllm_ci-shaped assertion
     # would go blind on two thirds of what this removes.
-    always = {s.step_id for p in state.pipelines for s in p.steps if s.always_runs}
+    always = always_run_ids(state)
     # Not "no CPU steps": vllm_ci:image-build-cpu always runs and stays.
     assert set(sel.selected) - always == defined
 
@@ -1286,7 +1290,7 @@ def test_class_table_module_inherits_the_table_coverage(state):
     assert sel.claims[0].rule == "graph"
     assert table in sel.claims[0].detail
     table_sel = select(state, [table])
-    always = {s.step_id for p in state.pipelines for s in p.steps if s.always_runs}
+    always = always_run_ids(state)
     assert set(sel.selected) <= set(table_sel.selected) | always | set(sel.manual_hits)
 
 
@@ -1348,7 +1352,7 @@ def test_config_file_edit_scopes_to_one_pipeline(state):
 def test_referenced_ci_script_selects_its_steps(state):
     sel = select(state, [".buildkite/scripts/hardware_ci/run-cpu-test.sh"])
     assert not sel.run_all
-    always = {s.step_id for p in state.pipelines for s in p.steps if s.always_runs}
+    always = always_run_ids(state)
     assert set(sel.selected) - always
 
 
@@ -1371,6 +1375,7 @@ def test_lm_eval_harness_routes_to_its_steps_not_run_all(state, vllm_repo):
         assert len(sel.selected) < 60, f"{path} selects {len(sel.selected)}"
 
 
+@pytest.mark.quiet_preflight
 def test_a_buildkite_script_beside_the_pipeline_yaml_is_not_owned_by_it(state):
     """The floor for the leg above, and why `.buildkite/` is in
     `_ROOT_PREFIXES`. Scripts live directly in `.buildkite/`, so without that
@@ -1452,6 +1457,7 @@ def test_a_generator_pattern_escalates_only_its_pipeline(state):
     assert set(sel.run_all) == {"vllm_rocm_ci"}
 
 
+@pytest.mark.quiet_preflight
 def test_a_dockerfile_executed_ci_script_rests_at_the_floor(state):
     """check-wheel-size.py runs inside the image build, and the builds are
     always-run, so the floor is its complete test."""
@@ -1461,6 +1467,7 @@ def test_a_dockerfile_executed_ci_script_rests_at_the_floor(state):
     assert not _non_always(sel, state)
 
 
+@pytest.mark.quiet_preflight
 def test_a_consumerless_ci_script_rests_at_the_floor(state):
     """A .buildkite subdir script no surface reaches selects the floor only."""
     sel = select(state, [".buildkite/scripts/rerun-test.sh"])
@@ -1608,15 +1615,43 @@ def test_no_examples_file_reaches_the_terminal_fail_open(state):
 
 # ---- declared-deps routing -------------------------------------------------
 
-RUST_DECLARERS = {
-    "vllm_ci::nvidia: (H200 MIG 18GB) Rust Frontend Core Correctness",
-    "vllm_ci::nvidia: (L4) Rust Frontend Distributed",
-    "vllm_ci::nvidia: (H200 MIG 18GB) Rust Frontend OpenAI Coverage",
-    "vllm_ci::nvidia: (H200 MIG 18GB) Rust Frontend Serve/Admin Coverage",
-    "vllm_ci::nvidia: (H200 MIG 35GB) Rust Frontend Tool Use",
-    "vllm_ci:rust-frontend-cargo-style-clippy",
-    "vllm_ci:rust-frontend-cargo-tests",
-}
+
+def _rust_declarers(state, path):
+    """The steps that declare `path`, derived rather than listed.
+
+    The list used to be written out, and vLLM rewrote every id in it by
+    relabelling and then keying the steps. Asking which steps declare the file
+    says the same thing and survives both.
+    """
+    declarers = declaring_steps(state, path)
+    assert len(declarers) >= 5, drift_message(
+        f"only {len(declarers)} steps declare {path}; the rust frontend suite named 9",
+        "both rust routing cases assert those declarers survive selection -- "
+        "that a rocm-named .rs file escapes amd-exclusive subtraction, and "
+        "that a binary-only crate file keeps them; with none left to survive, "
+        "a rule that dropped every rust step reads green",
+        "if the crate moved, probe a path the suite still declares",
+        "if the steps stopped declaring rust/, the source_file_dependencies in "
+        ".buildkite/test_areas/rust_frontend.yaml are what changed",
+    )
+    # The count alone cannot see this: the set could shed both mirrors, land on
+    # the floor, and stay green with the only steps amd-exclusive subtraction
+    # can reach gone.
+    by_id = steps_by_id(state)
+    assert any(by_id[s].mirror_hw == "amd" for s in declarers), drift_message(
+        f"no step declaring {path} is an AMD mirror; the rust frontend suite "
+        "mirrored two (openai-coverage and serve-admin-coverage)",
+        "the rocm-named case is about a .rs file escaping amd-exclusive "
+        "subtraction, and a mirror is the only kind of step that subtraction "
+        "removes; with the mirrors gone that case survives on steps it was "
+        "never about and asserts nothing it is named for",
+        "if the suite mirrors onto AMD by some new mechanism, derive the "
+        "mirrors from that rather than from Step.mirror_hw",
+        "if vLLM stopped mirroring the rust suite onto AMD, the subtraction "
+        "has no rust subject left and test_rocm_named_rust_file_selects_"
+        "rust_steps is what to retire",
+    )
+    return declarers
 
 
 def test_rust_toolchain_routes_to_cargo_steps(state):
@@ -1644,9 +1679,10 @@ def test_rocm_named_rust_file_selects_rust_steps(state):
     """The basename hardware-token heuristic is a Python/shell convention; a
     rocm-named rust file must keep its declaring h200 steps (.rs is not subject
     to amd-exclusive subtraction)."""
-    sel = select(state, ["rust/src/rocm_support.rs"])
+    path = "rust/src/rocm_support.rs"
+    sel = select(state, [path])
     assert not sel.run_all
-    assert set(sel.selected) >= RUST_DECLARERS
+    assert set(sel.selected) >= _rust_declarers(state, path)
 
 
 def test_undeclared_oddball_still_fails_open(state):
@@ -1808,6 +1844,7 @@ def test_eval_config_yaml_covered_via_file_target_parent(state):
     assert len(_non_always(sel, state)) <= 8  # over-selection ceiling, not run-all
 
 
+@pytest.mark.quiet_preflight
 def test_manual_only_script_ref_selects_nothing_with_manual_hits(state):
     """A tests .sh referenced only by manual-only steps auto-selects nothing
     but shows those steps as manual hits (the _nothing_auto_runs hook)."""
@@ -2118,12 +2155,22 @@ def test_package_data_zero_auto_coverage_falls_open(state):
 def test_release_file_with_auto_declarer_selects_it(state):
     """A release-pipeline file a live auto step also declares as a source dep must
     select it: Docker Build Metadata runs docker-build-metadata-args.sh in its test."""
-    sel = select(state, [".buildkite/scripts/docker-build-metadata-args.sh"])
+    path = ".buildkite/scripts/docker-build-metadata-args.sh"
+    declarers = declaring_steps(state, path, auto_only=True)
+    assert declarers, drift_message(
+        f"no auto step declares {path} any more",
+        "this is the one case where the release-ci rule must NOT zero a file, "
+        "so with no live declarer the test passes on a file nothing runs",
+        "find another release-referenced script a live auto step declares, or "
+        "the release-ci exception itself is what died",
+    )
+    sel = select(state, [path])
     assert not sel.run_all
-    assert "vllm_ci::computer: (CPU) Docker Build Metadata" in sel.selected
+    assert declarers <= set(sel.selected)
     assert any(c.rule == "release-ci" for c in sel.claims)
 
 
+@pytest.mark.quiet_preflight
 def test_release_only_script_selects_nothing(state):
     path = ".buildkite/scripts/build-macos-wheel.sh"
     assert path in state.release_refs, "fixture drift: not a release ref"
@@ -2403,6 +2450,7 @@ def test_rocm_named_test_selects_the_cuda_jobs_that_collect_it(state):
     assert "vllm_ci:v1-attention-h100-mi300-amd:amd" in picked, sorted(picked)
 
 
+@pytest.mark.quiet_preflight
 def test_disarm_is_not_a_blanket_revert(state):
     """Every CUDA step an AMD-exclusive test selects must be one that actually
     collects it. Stated as the invariant rather than against a fixed example,
@@ -2411,7 +2459,7 @@ def test_disarm_is_not_a_blanket_revert(state):
     from ci_selector.codemap.selection import _directly_collects
 
     targets = {sid: st for p in state.pipelines for sid, st in p.targets.items()}
-    by_id = {s.step_id: s for p in state.pipelines for s in p.steps}
+    by_id = steps_by_id(state)
     paths = [
         f
         for f in state.catalog
@@ -2826,6 +2874,7 @@ def test_the_site_file_itself_still_fails_open(state):
     assert _selected(sel) > _selected(select(state, [site]))
 
 
+@pytest.mark.quiet_preflight
 def test_selected_by_file_covers_every_attributable_step(state):
     """The per-file inverse of `selected`, and its completeness contract.
 
@@ -2845,7 +2894,7 @@ def test_selected_by_file_covers_every_attributable_step(state):
     attributed = {s for steps in sel.selected_by_file.values() for s in steps}
     assert attributed <= set(sel.selected), "attributed a step that was not selected"
 
-    always = {s.step_id for p in state.pipelines for s in p.steps if s.always_runs}
+    always = always_run_ids(state)
     unattributed = set(sel.selected) - attributed
     assert unattributed <= always, (
         f"steps selected with no file and no always-run reason: "
@@ -2914,9 +2963,10 @@ def test_rust_binary_only_file_stays_off_the_image_union(state):
     declarers, gate-env steps and hardware-image consumers, and nothing else.
     Borrowed whole-context images used to balloon it. The ceiling is loose on
     purpose so pipeline churn does not break the test."""
-    sel = select(state, ["rust/src/server/src/lib.rs"])
+    path = "rust/src/server/src/lib.rs"
+    sel = select(state, [path])
     assert not sel.run_all
-    assert set(sel.selected) >= RUST_DECLARERS
+    assert set(sel.selected) >= _rust_declarers(state, path)
     vllm_ci = {s for s in sel.selected if s.startswith("vllm_ci:")}
     assert len(vllm_ci) < 60, sorted(vllm_ci)
 

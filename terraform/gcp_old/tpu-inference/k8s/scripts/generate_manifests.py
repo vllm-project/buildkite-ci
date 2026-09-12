@@ -47,6 +47,14 @@ DEFAULT_OUT = ROOT / "kueue" / "generated"
 # arbitrary.
 AGENT_TOKEN_SECRET_NAME = "buildkite-agent-token"
 
+# The same join, for the Secret holding the git SSH key: the SecretSync writes
+# it and the chart values name it as envFrom on the checkout container.
+GIT_CREDENTIALS_SECRET_NAME = "git-ssh-credentials"
+
+# The environment variable the agent looks the key up under, which encodes the
+# key's algorithm - see git_credentials.yaml.tpl. Change it with the key.
+GIT_SSH_KEY_ENV = "SSH_PRIVATE_ED25519_KEY"
+
 # The ComputeClass the manager's nodes are created from, and the name the
 # manager's namespace points at to make it the default for everything in it.
 # Here rather than in either template because it is the join between them: a
@@ -311,6 +319,14 @@ def launcher_profiles(fleet: dict, workers: list[str], tfvars: dict) -> str:
                     "project": tfvars["hf_token_secret_project"],
                     "secret": tfvars["hf_token_secret_id"],
                 },
+                # Test Engine. The collector runs inside the workload, not in
+                # the agent, so the token has to reach the pod; without it a
+                # suite still passes and reports nothing, which is the failure
+                # mode worth designing against.
+                "BUILDKITE_ANALYTICS_TOKEN": {
+                    "project": tfvars["analytics_token_secret_project"],
+                    "secret": tfvars["analytics_token_secret_id"],
+                },
             },
             "total_max_seconds": int(tfvars["tpu_total_max_seconds"]),
             # How the launcher gets from an admitted workload to the pod logs.
@@ -473,6 +489,20 @@ def generate(tfvars: dict, out_dir: Path) -> dict:
             AGENT_TOKEN_SECRET_ID=tfvars["agent_token_secret_id"],
         ),
     )
+    # Manager only, and beside the agent token rather than after it: both are
+    # read by the same service account and both have to exist before the
+    # controller that mounts them starts.
+    write(
+        base / "workload" / "01-git-credentials.yaml",
+        render(
+            "git_credentials",
+            NAMESPACE=namespace,
+            PROJECT_ID=project,
+            SECRET_NAME=GIT_CREDENTIALS_SECRET_NAME,
+            GIT_SSH_KEY_SECRET_ID=tfvars["git_ssh_key_secret_id"],
+            GIT_SSH_KEY_ENV=GIT_SSH_KEY_ENV,
+        ),
+    )
     write(
         base / "system" / "20-auth-plugin.yaml",
         render(
@@ -561,6 +591,7 @@ def generate(tfvars: dict, out_dir: Path) -> dict:
         render(
             "agent_stack_values",
             AGENT_TOKEN_SECRET_NAME=AGENT_TOKEN_SECRET_NAME,
+            GIT_CREDENTIALS_SECRET_NAME=GIT_CREDENTIALS_SECRET_NAME,
             BUILDKITE_QUEUE=tfvars["buildkite_queue"],
         ),
     )

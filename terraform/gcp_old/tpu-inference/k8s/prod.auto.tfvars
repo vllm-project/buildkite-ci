@@ -23,6 +23,10 @@ analytics_token_secret_id      = "tpu_commons_buildkite_analytics_token"
 hf_token_secret_project = "cloud-tpu-inference-test"
 hf_token_secret_id      = "bm-agent-hf-token"
 
+# The GitHub deploy key an agent pod clones a private repository with, which is
+# vllm-torchtpu; tpu-inference is public and needs none.
+git_ssh_key_secret_id = "vllm_torchtpu_deploy_key"
+
 # us-central1 to sit with the rest of the CI control plane: the monitoring VM,
 # the cache buckets, and the Artifact Registry these nodes pull from. The
 # manager holds no TPUs, so it is not tied to a reservation's zone.

@@ -673,6 +673,62 @@
         "reference_url": "https://github.com/vllm-project/vllm/pull/56423",
         "notes": "The FlashInfer post-release bump introduced module-scope CUDA initialization before the fork-based test; spawning isolated tests passed all three exact L4 shards in build #88281."
       }
+    },
+    {
+      "id": "pr-54416-main-88492-model-executor",
+      "job_name": "H200 MIG 35GB Model Executor",
+      "job_key": "model-executor",
+      "culprit_pr": {
+        "number": 54416,
+        "url": "https://github.com/vllm-project/vllm/pull/54416",
+        "merge_commit": "dca96bf97b350204937a72c4d386b79b425f3989"
+      },
+      "pr_ci": {
+        "ran": false,
+        "state": "blocked",
+        "build_number": 88369,
+        "job_id": "01a0914a-5c07-4f0e-a224-a79cf2de9d09",
+        "url": "https://buildkite.com/vllm/ci/builds/88369#01a0914a-5c07-4f0e-a224-a79cf2de9d09"
+      },
+      "main_failure": {
+        "build_number": 88492,
+        "job_id": "01a094a7-396e-4d7a-85b8-76af06ee9d44",
+        "url": "https://buildkite.com/vllm/ci/builds/88492#01a094a7-396e-4d7a-85b8-76af06ee9d44",
+        "signature": "Qwen3 Omni DSpark test mock lacked load_config after the draft-model loader contract changed"
+      },
+      "causal_confirmation": {
+        "kind": "fix",
+        "reference_url": "https://github.com/vllm-project/vllm/pull/56600",
+        "notes": "The fix supplies the missing LoadConfig and pipeline-group stubs; the focused Qwen3 Omni DSpark test passes."
+      }
+    },
+    {
+      "id": "pr-54416-main-88492-amd-model-executor",
+      "job_name": "MI300 Model Executor",
+      "job_key": "amd-model-executor",
+      "culprit_pr": {
+        "number": 54416,
+        "url": "https://github.com/vllm-project/vllm/pull/54416",
+        "merge_commit": "dca96bf97b350204937a72c4d386b79b425f3989"
+      },
+      "pr_ci": {
+        "ran": false,
+        "state": "blocked",
+        "build_number": 88369,
+        "job_id": "01a0914a-5bb3-4346-a9a0-7c8d8138847c",
+        "url": "https://buildkite.com/vllm/ci/builds/88369#01a0914a-5bb3-4346-a9a0-7c8d8138847c"
+      },
+      "main_failure": {
+        "build_number": 88492,
+        "job_id": "01a094a7-3934-45db-bf7f-0d60008816d2",
+        "url": "https://buildkite.com/vllm/ci/builds/88492#01a094a7-3934-45db-bf7f-0d60008816d2",
+        "signature": "Qwen3 Omni DSpark test mock lacked load_config after the draft-model loader contract changed"
+      },
+      "causal_confirmation": {
+        "kind": "fix",
+        "reference_url": "https://github.com/vllm-project/vllm/pull/56600",
+        "notes": "The fix supplies the missing LoadConfig and pipeline-group stubs; the focused Qwen3 Omni DSpark test passes."
+      }
     }
   ]
 }

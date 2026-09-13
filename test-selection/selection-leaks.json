@@ -1002,7 +1002,7 @@
         "build_number": 88593,
         "job_id": "01a098cf-26d1-47f1-9ed4-dd3654d42b24",
         "url": "https://buildkite.com/vllm/ci/builds/88593#01a098cf-26d1-47f1-9ed4-dd3654d42b24",
-        "signature": "the lane timed out after 17 sampler JIT warmups added 215 seconds while 192 tests passed; its hot-cache retry then passed"
+        "signature": "the lane timed out after 17 sampler JIT warmups added 215 seconds while 192 tests passed, and its only unchanged retry also timed out"
       },
       "causal_confirmation": {
         "kind": "fix",
@@ -1039,6 +1039,34 @@
       }
     },
     {
+      "id": "pr-56323-main-88593-examples",
+      "job_name": "H200 MIG 35GB Examples",
+      "job_key": "examples",
+      "culprit_pr": {
+        "number": 56323,
+        "url": "https://github.com/vllm-project/vllm/pull/56323",
+        "merge_commit": "aed894c190aa3db74c502d521b3bc3935ad85de1"
+      },
+      "pr_ci": {
+        "ran": false,
+        "state": "not_selected",
+        "build_number": 88574,
+        "job_id": null,
+        "url": "https://buildkite.com/vllm/ci/builds/88574"
+      },
+      "main_failure": {
+        "build_number": 88593,
+        "job_id": "01a098cf-26d3-4fbd-9701-7b2da1e36bcf",
+        "url": "https://buildkite.com/vllm/ci/builds/88593#01a098cf-26d3-4fbd-9701-7b2da1e36bcf",
+        "signature": "the lane timed out after 16 sampler JIT warmups added 1083 seconds while 15 of 17 example commands completed"
+      },
+      "causal_confirmation": {
+        "kind": "code_analysis",
+        "reference_url": "https://github.com/vllm-project/vllm/pull/56323",
+        "notes": "The preceding full main completed the exact lane in 27m17s. After PR #56323 registered about 120 sampler keys per engine, the job exceeded its 40-minute budget without a failed command; exact rollback coverage is pending."
+      }
+    },
+    {
       "id": "pr-56323-main-88593-extract-hidden-states-integration",
       "job_name": "L4 Extract Hidden States Integration",
       "job_key": "extract-hidden-states-integration-2-gpus",
@@ -1064,6 +1092,34 @@
         "kind": "code_analysis",
         "reference_url": "https://github.com/vllm-project/vllm/pull/56654",
         "notes": "The preceding full main completed the exact job in 2m10s. Both post-PR #56323 attempts failed after 122.34s while the two TP workers were still warming sampler kernels; merged PR #56654 removes that registration."
+      }
+    },
+    {
+      "id": "pr-56323-main-88593-pipeline-context-parallelism-4-gpus",
+      "job_name": "L4 Pipeline + Context Parallelism",
+      "job_key": "pipeline-context-parallelism-4-gpus",
+      "culprit_pr": {
+        "number": 56323,
+        "url": "https://github.com/vllm-project/vllm/pull/56323",
+        "merge_commit": "aed894c190aa3db74c502d521b3bc3935ad85de1"
+      },
+      "pr_ci": {
+        "ran": false,
+        "state": "not_selected",
+        "build_number": 88574,
+        "job_id": null,
+        "url": "https://buildkite.com/vllm/ci/builds/88574"
+      },
+      "main_failure": {
+        "build_number": 88593,
+        "job_id": "01a098cf-2643-446f-8662-3236f98c94fb",
+        "url": "https://buildkite.com/vllm/ci/builds/88593#01a098cf-2643-446f-8662-3236f98c94fb",
+        "signature": "the lane timed out after 78 worker sampler JIT warmups added 1186 seconds while 31 tests passed"
+      },
+      "causal_confirmation": {
+        "kind": "code_analysis",
+        "reference_url": "https://github.com/vllm-project/vllm/pull/56323",
+        "notes": "The preceding full main completed the exact lane in 42m32s. After PR #56323 registered sampler kernels across parallel workers, the job exceeded its 55-minute budget without a failed test; exact rollback coverage is pending."
       }
     }
   ]

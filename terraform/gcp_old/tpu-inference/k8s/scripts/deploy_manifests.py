@@ -449,9 +449,13 @@ def main() -> int:
 
         index = verify_generated()
         verify_buckets()
-        # In the order the generator listed them: the manager first, so its
-        # queues exist before a worker starts reporting to them.
-        clusters = index["clusters"]
+        # Workers first, manager last. What the manager holds is the launcher's
+        # registry, and everything in it is a promise about a worker - the
+        # queues a shape can be admitted to, the Secret a forwarded credential
+        # resolves against. A manager updated ahead of its workers is one
+        # promising things that are not there yet, and the pod that discovers
+        # it does so holding a TPU reservation.
+        clusters = sorted(index["clusters"], key=lambda c: c["role"] == "manager")
         print(f"Kueue v{index['kueue_version']}, JobSet v{index['jobset_version']}, "
               f"agent-stack-k8s v{index['agent_stack_version']}, "
               f"{len(clusters)} cluster(s).")

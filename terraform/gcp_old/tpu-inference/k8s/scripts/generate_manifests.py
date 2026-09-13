@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import math
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -54,6 +55,28 @@ GIT_CREDENTIALS_SECRET_NAME = "git-ssh-credentials"
 # The environment variable the agent looks the key up under, which encodes the
 # key's algorithm - see git_credentials.yaml.tpl. Change it with the key.
 GIT_SSH_KEY_ENV = "SSH_PRIVATE_ED25519_KEY"
+
+
+def fleet_secret_name(env_name: str) -> str:
+    """What a fleet credential is called once it is a Kubernetes Secret.
+
+    Derived from the variable rather than configured, because this is the join
+    between two generated things - the SecretSync on a worker writes it, the
+    launcher's registry tells the launcher to point a secretKeyRef at it - and
+    a join nobody can misspell is better than one more name to keep in step.
+    """
+    name = "fleet-" + env_name.lower().replace("_", "-")
+    # Checked here rather than left to kubectl, which would reject it partway
+    # through a deploy with some clusters already updated. Underscores fold to
+    # dashes, so two names can also arrive at one Secret; the caller checks
+    # that, since only it can see the whole set.
+    if not re.fullmatch(r"[a-z0-9]([-a-z0-9]*[a-z0-9])?", name):
+        raise SystemExit(
+            f"env_secrets key {env_name!r} does not make a Kubernetes name: "
+            f"got {name!r}, which must be lowercase alphanumerics and dashes"
+        )
+    return name
+
 
 # The ComputeClass the manager's nodes are created from, and the name the
 # manager's namespace points at to make it the default for everything in it.
@@ -309,6 +332,58 @@ def queues(shapes: dict[str, int], namespace: str, checks: bool) -> str:
     return "".join(out)
 
 
+def fleet_secret_docs(tfvars: dict, namespace: str) -> str:
+    """A SecretProviderClass and a SecretSync per fleet credential.
+
+    `path` is internal - it names the value for the SecretSync below, and is
+    never a file anywhere, since nothing mounts these as a CSI volume.
+
+    `versions/latest` so a rotation is picked up without a deploy. A container
+    resolves a secretKeyRef once, when it is created, so a running workload
+    keeps the version it started with - but a workload is one job long, and the
+    next job gets whatever the sync last wrote.
+    """
+    docs = []
+    seen = {}
+    for env_name, spec in sorted(tfvars["env_secrets"].items()):
+        name = fleet_secret_name(env_name)
+        if name in seen:
+            raise SystemExit(
+                f"env_secrets keys {seen[name]!r} and {env_name!r} both name "
+                f"the Secret {name!r}; one of them would silently win"
+            )
+        seen[name] = env_name
+        docs.append(
+            f"""---
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: {name}
+  namespace: {namespace}
+spec:
+  provider: gke
+  parameters:
+    secrets: |
+      - resourceName: "projects/{spec['project']}/secrets/{spec['secret']}/versions/latest"
+        path: "value"
+---
+apiVersion: secret-sync.gke.io/v1
+kind: SecretSync
+metadata:
+  name: {name}
+  namespace: {namespace}
+spec:
+  serviceAccountName: secret-sync
+  secretProviderClassName: {name}
+  secretObject:
+    type: Opaque
+    data:
+      - sourcePath: value
+        targetKey: {env_name}"""
+        )
+    return "\n".join(docs)
+
+
 def launcher_profiles(fleet: dict, workers: list[str], tfvars: dict) -> str:
     """The registry the launcher resolves a workload's hardware against.
 
@@ -334,22 +409,16 @@ def launcher_profiles(fleet: dict, workers: list[str], tfvars: dict) -> str:
             # own account, which is the point.
             "workload_service_accounts": ["default", "tpu-workload"],
             # Names the launcher can supply itself when a step forwards one it
-            # does not have. Fleet-wide credentials, held by the launcher's
-            # account so a pipeline needs no grant of its own - and still only
-            # reaching a workload that asked by name.
+            # does not have. Fleet-wide credentials, and still only reaching a
+            # workload that asked by name.
+            #
+            # Where the sync put it on the worker, not where it came from in
+            # Secret Manager: the launcher points a secretKeyRef at it and
+            # never reads the value. Same tfvars list the syncs are generated
+            # from, so a name here is a Secret that exists.
             "env_secrets": {
-                "HF_TOKEN": {
-                    "project": tfvars["hf_token_secret_project"],
-                    "secret": tfvars["hf_token_secret_id"],
-                },
-                # Test Engine. The collector runs inside the workload, not in
-                # the agent, so the token has to reach the pod; without it a
-                # suite still passes and reports nothing, which is the failure
-                # mode worth designing against.
-                "BUILDKITE_ANALYTICS_TOKEN": {
-                    "project": tfvars["analytics_token_secret_project"],
-                    "secret": tfvars["analytics_token_secret_id"],
-                },
+                name: {"secret": fleet_secret_name(name), "key": name}
+                for name in sorted(tfvars["env_secrets"])
             },
             "total_max_seconds": int(tfvars["tpu_total_max_seconds"]),
             # How the launcher gets from an admitted workload to the pod logs.
@@ -488,6 +557,14 @@ def generate(tfvars: dict, out_dir: Path) -> dict:
         write(
             base / "workload" / "00-service-account.yaml",
             render("workload_sa", NAMESPACE=namespace, PROJECT_ID=worker["project"]),
+        )
+        write(
+            base / "workload" / "05-fleet-secrets.yaml",
+            render(
+                "fleet_secrets",
+                NAMESPACE=namespace,
+                SECRET_DOCS=fleet_secret_docs(tfvars, namespace),
+            ),
         )
         write(
             base / "workload" / "10-cache-volumes.yaml",

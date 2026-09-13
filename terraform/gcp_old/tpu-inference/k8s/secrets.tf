@@ -23,40 +23,42 @@ resource "google_secret_manager_secret_iam_member" "agent_token_sync" {
   member    = "serviceAccount:${var.project_id}.svc.id.goog[${var.namespace}/secret-sync]"
 }
 
-# The Buildkite Test Engine token, in the test suite's own project. Also
-# pre-existing: the bare-metal agents read it too, so both lanes report into
-# one suite.
-data "google_secret_manager_secret" "analytics_token" {
-  project   = var.analytics_token_secret_project
-  secret_id = var.analytics_token_secret_id
+# The credentials a workload reads from its own environment, each in the
+# project that owns it - which is never this one. Pre-existing like the agent
+# token, and for the same reason data sources: a name that is wrong fails at
+# plan time instead of quietly granting access to nothing.
+data "google_secret_manager_secret" "env_secret" {
+  for_each = var.env_secrets
+
+  project   = each.value.project
+  secret_id = each.value.secret
 }
 
-# Read straight by the launcher pod, not synced: nothing here has to be pointed
-# at a Kubernetes Secret, and a Secret would be a copy of a credential sitting
-# in the namespace between runs. Scoped to the one secret, not its project -
-# that project is the suite's and holds other people's secrets.
-resource "google_secret_manager_secret_iam_member" "launcher_analytics_token" {
-  project   = var.analytics_token_secret_project
-  secret_id = data.google_secret_manager_secret.analytics_token.secret_id
+# Granted to the sync on every cluster, the same way the git key is. The
+# Workload Identity pool is the project's rather than a cluster's, so the
+# principal below is one string for the manager and both workers and a new
+# worker inherits the grant by existing.
+#
+# Scoped to the individual secret, which matters more here than for the fleet's
+# own: these live in other teams' projects.
+resource "google_secret_manager_secret_iam_member" "env_secret_sync" {
+  for_each = var.env_secrets
+
+  project   = each.value.project
+  secret_id = data.google_secret_manager_secret.env_secret[each.key].secret_id
   role      = "roles/secretmanager.secretAccessor"
-  member    = local.launcher_principal
+  member    = "serviceAccount:${var.project_id}.svc.id.goog[${var.namespace}/secret-sync]"
 }
 
-# The Hugging Face token, in the bare-metal agents' project. A model behind a
-# gate cannot be fetched without it, and the fleet's model cache is shared, so
-# the first step to want a gated model pays for every later one.
-data "google_secret_manager_secret" "hf_token" {
-  project   = var.hf_token_secret_project
-  secret_id = var.hf_token_secret_id
-}
+# The same read for the launcher, which is the fleet's way back to a working
+# state if a sync stops writing. Reverting the launcher to resolving values
+# itself is one ConfigMap; a grant it does not hold is a Terraform round trip
+# through two other teams' projects, at the point where nothing is running.
+resource "google_secret_manager_secret_iam_member" "launcher_env_secret" {
+  for_each = var.env_secrets
 
-# Read by the launcher and forwarded into the workload with --env, so the value
-# is never a Kubernetes object and never appears in a pipeline. Same shape as
-# the Test Engine grant above and for the same reason: one secret, not the
-# project it happens to live in.
-resource "google_secret_manager_secret_iam_member" "launcher_hf_token" {
-  project   = var.hf_token_secret_project
-  secret_id = data.google_secret_manager_secret.hf_token.secret_id
+  project   = each.value.project
+  secret_id = data.google_secret_manager_secret.env_secret[each.key].secret_id
   role      = "roles/secretmanager.secretAccessor"
   member    = local.launcher_principal
 }

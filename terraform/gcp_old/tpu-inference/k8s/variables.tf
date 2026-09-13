@@ -132,25 +132,25 @@ variable "agent_token_secret_id" {
   EOT
 }
 
-variable "analytics_token_secret_project" {
-  type        = string
-  description = "Project holding the Buildkite Test Engine token. Not this one: it belongs to the suite, which predates this fleet and is shared with the bare-metal lane."
-}
-
-variable "hf_token_secret_project" {
-  type        = string
-  description = "Project holding the Hugging Face token. Not this one: it belongs to the bare-metal agents, and a gated model should be fetched under the same identity in both lanes."
-}
-
-variable "hf_token_secret_id" {
-  type        = string
+variable "env_secrets" {
+  type = map(object({
+    project = string
+    secret  = string
+  }))
   description = <<-EOT
-    Secret Manager secret holding the Hugging Face token.
+    Credentials the fleet supplies to a workload that forwards the name, keyed
+    by the environment variable it is read from.
 
-    Read by the launcher pod and forwarded into the workload, since the pod
-    that downloads the weights is the only one that needs it.
+    Read by both Terraform and scripts/generate_manifests.py, and the one place
+    the set is written down: Terraform grants the sync read on each, the
+    generator turns each into a SecretSync on every worker, and the launcher's
+    registry decides from the same map whether a --env name may be supplied at
+    all. A secret listed here is one every pipeline on the fleet can ask for,
+    so the list is short on purpose.
 
-    Named rather than defaulted because the grant is scoped to this one secret.
+    Each names its own project, because none of these belong to this fleet.
+    Scoping the grant to the secret rather than its project matters more than
+    usual for that reason - those projects hold other people's secrets.
   EOT
 }
 
@@ -164,18 +164,6 @@ variable "git_ssh_key_secret_id" {
     every agent pod; a public repository ignores it. Its algorithm is part of
     the contract - see GIT_SSH_KEY_ENV in scripts/generate_manifests.py - so
     replacing it with a key of another type is a change in two places.
-  EOT
-}
-
-variable "analytics_token_secret_id" {
-  type        = string
-  description = <<-EOT
-    Secret Manager secret holding the Buildkite Test Engine token.
-
-    Read by the launcher pod and forwarded into the workload, since a TPU pod
-    is the only thing that can see its own test output.
-
-    Named rather than defaulted because the grant is scoped to this one secret.
   EOT
 }
 

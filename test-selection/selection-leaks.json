@@ -729,6 +729,230 @@
         "reference_url": "https://github.com/vllm-project/vllm/pull/56600",
         "notes": "The fix supplies the missing LoadConfig and pipeline-group stubs; the focused Qwen3 Omni DSpark test passes."
       }
+    },
+    {
+      "id": "pr-56323-main-88580-spec-decode-draft-model",
+      "job_name": "H200 MIG 18GB Spec Decode Draft Model",
+      "job_key": "spec-decode-draft-model",
+      "culprit_pr": {
+        "number": 56323,
+        "url": "https://github.com/vllm-project/vllm/pull/56323",
+        "merge_commit": "aed894c190aa3db74c502d521b3bc3935ad85de1"
+      },
+      "pr_ci": {
+        "ran": false,
+        "state": "not_selected",
+        "build_number": 88574,
+        "job_id": null,
+        "url": "https://buildkite.com/vllm/ci/builds/88574"
+      },
+      "main_failure": {
+        "build_number": 88580,
+        "job_id": "01a09827-e5f0-49f8-a44b-31af2433df26",
+        "url": "https://buildkite.com/vllm/ci/builds/88580#01a09827-e5f0-49f8-a44b-31af2433df26",
+        "signature": "the lane timed out after repeated sampler JIT warmups added 884 seconds across 15 engine starts"
+      },
+      "causal_confirmation": {
+        "kind": "code_analysis",
+        "reference_url": "https://github.com/vllm-project/vllm/pull/56323",
+        "notes": "The culprit registered about 120 sampler compile keys on every accelerator engine; the exact job had no failed test and was externally canceled at its timeout after 15 measured warmups."
+      }
+    },
+    {
+      "id": "pr-56323-main-88580-e2e-core",
+      "job_name": "H200 MIG 35GB E2E Core",
+      "job_key": "e2e-core-1-gpu",
+      "culprit_pr": {
+        "number": 56323,
+        "url": "https://github.com/vllm-project/vllm/pull/56323",
+        "merge_commit": "aed894c190aa3db74c502d521b3bc3935ad85de1"
+      },
+      "pr_ci": {
+        "ran": false,
+        "state": "not_selected",
+        "build_number": 88574,
+        "job_id": null,
+        "url": "https://buildkite.com/vllm/ci/builds/88574"
+      },
+      "main_failure": {
+        "build_number": 88580,
+        "job_id": "01a09827-e555-49aa-bd53-028b3d6d5252",
+        "url": "https://buildkite.com/vllm/ci/builds/88580#01a09827-e555-49aa-bd53-028b3d6d5252",
+        "signature": "the lane timed out while repeated sampler JIT warmups were compiling about 120 keys per engine"
+      },
+      "causal_confirmation": {
+        "kind": "code_analysis",
+        "reference_url": "https://github.com/vllm-project/vllm/pull/56323",
+        "notes": "The culprit registered four native sampler warmups on every accelerator engine; this job spent 1011 seconds in 21 warmups before timeout, while its tests were still progressing without failures."
+      }
+    },
+    {
+      "id": "pr-56323-main-88580-multimodal-models-standard-4",
+      "job_name": "H200 MIG 35GB Multimodal Models (Standard) 4: other + whisper",
+      "job_key": "multi-modal-models-standard-4-other-whisper",
+      "culprit_pr": {
+        "number": 56323,
+        "url": "https://github.com/vllm-project/vllm/pull/56323",
+        "merge_commit": "aed894c190aa3db74c502d521b3bc3935ad85de1"
+      },
+      "pr_ci": {
+        "ran": false,
+        "state": "not_selected",
+        "build_number": 88574,
+        "job_id": null,
+        "url": "https://buildkite.com/vllm/ci/builds/88574"
+      },
+      "main_failure": {
+        "build_number": 88580,
+        "job_id": "01a09827-e5e0-4891-a8ce-b08e7d4c8784",
+        "url": "https://buildkite.com/vllm/ci/builds/88580#01a09827-e5e0-4891-a8ce-b08e7d4c8784",
+        "signature": "the lane timed out after repeated sampler JIT warmups added 1415 seconds across 34 engine starts"
+      },
+      "causal_confirmation": {
+        "kind": "code_analysis",
+        "reference_url": "https://github.com/vllm-project/vllm/pull/56323",
+        "notes": "The preceding main completed the exact lane in 46m19s; after the culprit registered about 120 sampler keys per engine, this build was canceled during the final Whisper tests while the follow-on main barely passed in 71m20s."
+      }
+    },
+    {
+      "id": "pr-56323-main-88580-spec-decode-speculators-mtp",
+      "job_name": "H200 MIG 35GB Spec Decode Speculators + MTP",
+      "job_key": "spec-decode-speculators-mtp",
+      "culprit_pr": {
+        "number": 56323,
+        "url": "https://github.com/vllm-project/vllm/pull/56323",
+        "merge_commit": "aed894c190aa3db74c502d521b3bc3935ad85de1"
+      },
+      "pr_ci": {
+        "ran": false,
+        "state": "not_selected",
+        "build_number": 88574,
+        "job_id": null,
+        "url": "https://buildkite.com/vllm/ci/builds/88574"
+      },
+      "main_failure": {
+        "build_number": 88580,
+        "job_id": "01a09827-e5f2-4af5-8930-50d36e9fa00b",
+        "url": "https://buildkite.com/vllm/ci/builds/88580#01a09827-e5f2-4af5-8930-50d36e9fa00b",
+        "signature": "the lane timed out after repeated sampler JIT warmups added 1039 seconds across 14 engine starts"
+      },
+      "causal_confirmation": {
+        "kind": "code_analysis",
+        "reference_url": "https://github.com/vllm-project/vllm/pull/56323",
+        "notes": "The culprit registered about 120 sampler compile keys on every accelerator engine; the exact job was canceled only after its final GSM8K evaluation had begun and was progressing normally."
+      }
+    },
+    {
+      "id": "pr-56323-main-88581-basic-models-tests-other",
+      "job_name": "H200 MIG 35GB Basic Models (Other)",
+      "job_key": "basic-models-tests-other",
+      "culprit_pr": {
+        "number": 56323,
+        "url": "https://github.com/vllm-project/vllm/pull/56323",
+        "merge_commit": "aed894c190aa3db74c502d521b3bc3935ad85de1"
+      },
+      "pr_ci": {
+        "ran": false,
+        "state": "not_selected",
+        "build_number": 88574,
+        "job_id": null,
+        "url": "https://buildkite.com/vllm/ci/builds/88574"
+      },
+      "main_failure": {
+        "build_number": 88581,
+        "job_id": "01a09829-48b5-49aa-af83-3b25ae5d5669",
+        "url": "https://buildkite.com/vllm/ci/builds/88581#01a09829-48b5-49aa-af83-3b25ae5d5669",
+        "signature": "the lane timed out after sampler JIT warmup grew from under one second to 1185 seconds across 18 engine starts"
+      },
+      "causal_confirmation": {
+        "kind": "code_analysis",
+        "reference_url": "https://github.com/vllm-project/vllm/pull/56323",
+        "notes": "The immediately preceding main build completed the exact lane in 23m45s with 18 warmups totaling under one second; after the culprit registered about 120 sampler keys per engine, two consecutive main builds timed out."
+      }
+    },
+    {
+      "id": "pr-56323-main-88581-language-models-hybrid-shard-2",
+      "job_name": "H200 MIG 35GB Language Models (Hybrid) Shard 2",
+      "job_key": "language-models-tests-hybrid",
+      "culprit_pr": {
+        "number": 56323,
+        "url": "https://github.com/vllm-project/vllm/pull/56323",
+        "merge_commit": "aed894c190aa3db74c502d521b3bc3935ad85de1"
+      },
+      "pr_ci": {
+        "ran": false,
+        "state": "not_selected",
+        "build_number": 88574,
+        "job_id": null,
+        "url": "https://buildkite.com/vllm/ci/builds/88574"
+      },
+      "main_failure": {
+        "build_number": 88581,
+        "job_id": "01a09829-48bb-4f91-9cfe-ecba26fbaad6",
+        "url": "https://buildkite.com/vllm/ci/builds/88581#01a09829-48bb-4f91-9cfe-ecba26fbaad6",
+        "signature": "the lane timed out after repeated sampler JIT warmups added 1274 seconds across 22 engine starts"
+      },
+      "causal_confirmation": {
+        "kind": "code_analysis",
+        "reference_url": "https://github.com/vllm-project/vllm/pull/56323",
+        "notes": "The preceding main build completed this exact shard in 48m15s; after the culprit registered about 120 sampler keys per engine, two consecutive main builds timed out while tests were still progressing without failures."
+      }
+    },
+    {
+      "id": "pr-56323-main-88581-model-executor",
+      "job_name": "H200 MIG 35GB Model Executor",
+      "job_key": "model-executor",
+      "culprit_pr": {
+        "number": 56323,
+        "url": "https://github.com/vllm-project/vllm/pull/56323",
+        "merge_commit": "aed894c190aa3db74c502d521b3bc3935ad85de1"
+      },
+      "pr_ci": {
+        "ran": false,
+        "state": "not_selected",
+        "build_number": 88574,
+        "job_id": null,
+        "url": "https://buildkite.com/vllm/ci/builds/88574"
+      },
+      "main_failure": {
+        "build_number": 88581,
+        "job_id": "01a09829-48b0-49d2-887b-6912048aee7e",
+        "url": "https://buildkite.com/vllm/ci/builds/88581#01a09829-48b0-49d2-887b-6912048aee7e",
+        "signature": "the lane timed out after repeated sampler JIT warmups added 818 seconds across 31 engine starts"
+      },
+      "causal_confirmation": {
+        "kind": "code_analysis",
+        "reference_url": "https://github.com/vllm-project/vllm/pull/56323",
+        "notes": "The preceding selected main completed the exact lane in 41m05s; after the culprit registered four native sampler warmups per engine, two consecutive main builds timed out while another engine was compiling without a failed test."
+      }
+    },
+    {
+      "id": "pr-56323-main-88581-v1-kv-connectors",
+      "job_name": "H200 MIG 35GB V1 KV Connectors",
+      "job_key": "v1-kv-connectors",
+      "culprit_pr": {
+        "number": 56323,
+        "url": "https://github.com/vllm-project/vllm/pull/56323",
+        "merge_commit": "aed894c190aa3db74c502d521b3bc3935ad85de1"
+      },
+      "pr_ci": {
+        "ran": false,
+        "state": "not_selected",
+        "build_number": 88574,
+        "job_id": null,
+        "url": "https://buildkite.com/vllm/ci/builds/88574"
+      },
+      "main_failure": {
+        "build_number": 88581,
+        "job_id": "01a09829-48ae-4a6d-8948-5d01a444b1d8",
+        "url": "https://buildkite.com/vllm/ci/builds/88581#01a09829-48ae-4a6d-8948-5d01a444b1d8",
+        "signature": "the lane timed out while its twelfth repeated sampler JIT warmup was still compiling"
+      },
+      "causal_confirmation": {
+        "kind": "code_analysis",
+        "reference_url": "https://github.com/vllm-project/vllm/pull/56323",
+        "notes": "The preceding main build needed 40m35s within a 45-minute budget; the culprit then added 712 seconds across 12 measured sampler warmups before this exact job was canceled."
+      }
     }
   ]
 }

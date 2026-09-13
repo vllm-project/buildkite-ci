@@ -59,8 +59,16 @@ GIT_SSH_KEY_ENV = "SSH_PRIVATE_ED25519_KEY"
 # manager's namespace points at to make it the default for everything in it.
 # Here rather than in either template because it is the join between them: a
 # namespace whose default names a class that does not exist leaves every pod in
-# it pending. Worker clusters have fixed TPU pools and get neither.
+# it pending.
 MANAGER_COMPUTE_CLASS = "manager-system"
+
+# The ComputeClass a worker's chip-less workload roles select. Named here rather
+# than only in the template because a manifest in the tpu-inference repo names
+# it too, in the nodeSelector of any role that holds no chips - so the string is
+# fleet-wide API, not an implementation detail of this file.
+#
+# No namespace default goes with it, unlike the manager's: see the template.
+WORKER_COMPUTE_CLASS = "worker-cpu"
 
 # The launcher's program, and the ConfigMap deploy_manifests.py builds out of
 # it. Not rendered into the generated tree: a program indented into YAML is not
@@ -145,6 +153,21 @@ def bucket_name(prefix: str, project: str, location: str, purpose: str) -> str:
     """
     digest = hashlib.sha256(f"{project}/{location}".encode()).hexdigest()[:8]
     return f"{prefix}-{purpose}-{digest}"
+
+
+def worker_node_service_account(prefix: str, project: str, location: str) -> str:
+    """The identity a worker's nodes run as, derived rather than configured.
+
+    iam.tf builds the same string and creates the account; a ComputeClass names
+    it so that the nodes GKE auto-creates run as it too, rather than falling
+    through to the Compute Engine default account. Two derivations of one name
+    can drift, and getting it wrong is not loud: GKE accepts an account that
+    does not exist and the node pool fails to register, or - worse, if the name
+    happens to resolve - the nodes come up with more authority than intended.
+    The suffix is the location because that is a worker's short name; see
+    locals.tf.
+    """
+    return f"{prefix}-wkr-{location}@{project}.iam.gserviceaccount.com"
 
 
 def render(name: str, **values) -> str:
@@ -428,6 +451,20 @@ def generate(tfvars: dict, out_dir: Path) -> dict:
 
         base = out_dir / worker_dir
         write(base / "system" / "10-kueue-config.yaml", kueue_config("worker"))
+        # Under system/, alongside the rest of what a worker has to hold before
+        # it can run anything. Nothing in this repo names the class; the roles
+        # that do arrive later, as workloads MultiKueue dispatches here, and a
+        # pod naming a class the cluster does not have stays pending.
+        write(
+            base / "system" / "00-compute-class.yaml",
+            render(
+                "compute_class_worker",
+                NAME=WORKER_COMPUTE_CLASS,
+                NODE_SERVICE_ACCOUNT=worker_node_service_account(
+                    prefix, worker["project"], worker["location"]
+                ),
+            ),
+        )
         write(
             base / "queues" / "00-namespace.yaml",
             render("namespace", NAMESPACE=namespace, EXTRA_LABELS=""),

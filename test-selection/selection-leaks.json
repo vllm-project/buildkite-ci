@@ -955,6 +955,62 @@
       }
     },
     {
+      "id": "pr-56323-main-88589-basic-correctness",
+      "job_name": "H200 MIG 18GB Basic Correctness",
+      "job_key": "basic-correctness",
+      "culprit_pr": {
+        "number": 56323,
+        "url": "https://github.com/vllm-project/vllm/pull/56323",
+        "merge_commit": "aed894c190aa3db74c502d521b3bc3935ad85de1"
+      },
+      "pr_ci": {
+        "ran": false,
+        "state": "not_selected",
+        "build_number": 88574,
+        "job_id": null,
+        "url": "https://buildkite.com/vllm/ci/builds/88574"
+      },
+      "main_failure": {
+        "build_number": 88589,
+        "job_id": "01a098c5-c44a-42eb-93b3-2f6364d7dab3",
+        "url": "https://buildkite.com/vllm/ci/builds/88589#01a098c5-c44a-42eb-93b3-2f6364d7dab3",
+        "signature": "the lane timed out after 33 sampler JIT warmups added 2024 seconds while its tests continued passing"
+      },
+      "causal_confirmation": {
+        "kind": "fix",
+        "reference_url": "https://github.com/vllm-project/vllm/pull/56654",
+        "notes": "The preceding full main completed the exact lane in 37m13s; after PR #56323 it ran for 68 minutes without a failed test. The exact lane passed in 33m47s on rollback PR #56654 build 88588."
+      }
+    },
+    {
+      "id": "pr-56323-main-88593-v1-sample",
+      "job_name": "H200 MIG 18GB V1 Sample",
+      "job_key": "v1-sample",
+      "culprit_pr": {
+        "number": 56323,
+        "url": "https://github.com/vllm-project/vllm/pull/56323",
+        "merge_commit": "aed894c190aa3db74c502d521b3bc3935ad85de1"
+      },
+      "pr_ci": {
+        "ran": false,
+        "state": "not_selected",
+        "build_number": 88574,
+        "job_id": null,
+        "url": "https://buildkite.com/vllm/ci/builds/88574"
+      },
+      "main_failure": {
+        "build_number": 88593,
+        "job_id": "01a098cf-26d1-47f1-9ed4-dd3654d42b24",
+        "url": "https://buildkite.com/vllm/ci/builds/88593#01a098cf-26d1-47f1-9ed4-dd3654d42b24",
+        "signature": "the lane timed out after 17 sampler JIT warmups added 215 seconds while 192 tests passed; its hot-cache retry then passed"
+      },
+      "causal_confirmation": {
+        "kind": "fix",
+        "reference_url": "https://github.com/vllm-project/vllm/pull/56654",
+        "notes": "The preceding full main completed the exact lane in 27m06s; the post-PR #56323 cold run exceeded its 35-minute budget. The exact lane passed in 20m07s on rollback PR #56654 build 88588."
+      }
+    },
+    {
       "id": "pr-56323-main-88593-cudagraph",
       "job_name": "H200 MIG 35GB CUDAGraph",
       "job_key": "cudagraph",
@@ -974,12 +1030,12 @@
         "build_number": 88593,
         "job_id": "01a098cf-2623-49ef-b655-b628195bf1af",
         "url": "https://buildkite.com/vllm/ci/builds/88593#01a098cf-2623-49ef-b655-b628195bf1af",
-        "signature": "the lane timed out after 13 sampler JIT warmups added 804 seconds while 28 tests passed"
+        "signature": "the lane timed out after 13 sampler JIT warmups added 804 seconds while 28 tests passed, and its only unchanged retry also timed out"
       },
       "causal_confirmation": {
         "kind": "code_analysis",
         "reference_url": "https://github.com/vllm-project/vllm/pull/56654",
-        "notes": "The preceding full main completed the exact lane in 22m17s; after PR #56323 registered about 120 sampler keys per engine, this job exceeded its 30-minute budget during the second test command. Merged PR #56654 reverts that registration."
+        "notes": "The preceding full main completed the exact lane in 22m17s; after PR #56323 registered about 120 sampler keys per engine, two different hosts exceeded the 30-minute budget during the second test command. Merged PR #56654 reverts that registration."
       }
     },
     {

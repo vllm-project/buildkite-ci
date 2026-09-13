@@ -11,17 +11,25 @@ namespace = "buildkite"
 # it and never owns its value.
 agent_token_secret_id = "vllm_buildkite_agent_token"
 
-# The Test Engine token, in the suite's own project rather than this one. Also
-# not created here: the bare-metal agents read the same secret, and the results
-# of a kube run and a bare-metal run should land in one suite.
-analytics_token_secret_project = "cloud-tpu-inference-test"
-analytics_token_secret_id      = "tpu_commons_buildkite_analytics_token"
-
-# The Hugging Face token, likewise the bare-metal agents' rather than one of
-# this fleet's: a gated model is gated per account, and the two lanes pull the
-# same weights into the same caches.
-hf_token_secret_project = "cloud-tpu-inference-test"
-hf_token_secret_id      = "bm-agent-hf-token"
+# Credentials any pipeline may ask for by name, keyed by the environment
+# variable a workload reads them from. None is created here: each belongs to
+# another project, and is shared with the bare-metal lane so that the two lanes
+# fetch a gated model under one account and report into one suite.
+env_secrets = {
+  # A gated model cannot be fetched without it, and the fleet's model cache is
+  # shared, so the first step to want one pays for every later one.
+  HF_TOKEN = {
+    project = "cloud-tpu-inference-test"
+    secret  = "bm-agent-hf-token"
+  }
+  # Test Engine. The collector runs inside the workload rather than in the
+  # agent, so the token has to reach the pod; without it a suite still passes
+  # and reports nothing, which is the failure mode worth designing against.
+  BUILDKITE_ANALYTICS_TOKEN = {
+    project = "cloud-tpu-inference-test"
+    secret  = "tpu_commons_buildkite_analytics_token"
+  }
+}
 
 # The GitHub deploy key an agent pod clones a private repository with, which is
 # vllm-torchtpu; tpu-inference is public and needs none.
@@ -72,11 +80,18 @@ launcher_image = "us-central1-docker.pkg.dev/cloud-ullm-inference-ci-cd/tpu-ci/l
 
 # A test gets three hours with the chips unless its manifest says otherwise,
 # matching the bare-metal budget so a step moving between the two lanes gets the
-# same allowance. Eleven in total is the ceiling on both the queueing and on
-# what a manifest may ask for, set by the longest workload the fleet runs: the
-# nightly P/D disaggregation benchmark, which serves for ten.
+# same allowance.
+#
+# A day in total, which is the ceiling on both the queueing and on what a
+# manifest may ask for. Set by the queue rather than by the work: the fleet has
+# eight v7x chips, so a build that fans out over several shapes puts most of its
+# steps behind the rest of itself, and one long benchmark holds every chip for
+# as long as it serves. A step that has been waiting since the previous evening
+# is waiting on hardware that is busy, not on anything wrong with it, and
+# failing it for that loses its place in line as well as its result - the retry
+# goes to the back of a queue it had already reached the front of.
 tpu_test_max_seconds  = 10800
-tpu_total_max_seconds = 39600
+tpu_total_max_seconds = 86400
 
 # Every CI image this fleet runs is built into the manager project's Artifact
 # Registry, and a step names its own tag, so the project is the boundary rather

@@ -39,10 +39,12 @@ workload does not run as the launcher's own identity.
 """
 
 import argparse
+import copy
 import json
 import os
 import re
 import shlex
+import shutil
 import signal
 import string
 import subprocess
@@ -107,16 +109,104 @@ WORKER_KUBECONFIG = "/tmp/worker.kubeconfig"
 # catching it here is cheaper than a confusing RBAC denial.
 SUPPORTED_KINDS = {"Job": "job", "JobSet": "jobset"}
 
+# Every kubectl and gcloud call the launcher makes is a single API request, so
+# this is generous for all of them. Generous on purpose: the cost of being
+# wrong is not symmetric. A call cut off early turns a slow control plane into
+# a failed test, while one that waits two minutes only delays a poll that runs
+# every few seconds anyway.
+CLI_TIMEOUT_SECONDS = 120
+
 
 def log(msg):
     print(f"~~~ launcher: {msg}", flush=True)
 
 
-def kubectl(*args, check=True):
-    return subprocess.run(
-        ["kubectl", "-n", NAMESPACE, *args],
-        check=check, capture_output=True, text=True,
-    )
+# The agent binary, which the controller copies onto the shared workspace
+# volume rather than onto this container's PATH. Looked up anyway, so an
+# invocation that does put it on PATH keeps working.
+AGENT_CLI = shutil.which("buildkite-agent") or "/workspace/buildkite-agent"
+
+
+def agent(*args):
+    """Run one buildkite-agent subcommand, best effort.
+
+    Everything the launcher uses this for is commentary on a run that is
+    happening either way, so a failure here is worth a line in the log and
+    nothing more. The credentials come from the step's own environment, which
+    is why there is nothing to pass.
+    """
+    try:
+        proc = subprocess.run(
+            [AGENT_CLI, *args], capture_output=True, text=True,
+            timeout=CLI_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        log(f"warning: buildkite-agent {args[0]} failed: {exc}")
+        return False
+    if proc.returncode != 0:
+        log(f"warning: buildkite-agent {' '.join(args[:2])} failed: "
+            f"{proc.stderr.strip()[:200]}")
+    return proc.returncode == 0
+
+
+def waiting_context():
+    """The annotation context for this step's "waiting for hardware" notice.
+
+    Per job rather than per build: several steps of one build queue at once,
+    each for its own shape, and a shared context would have them overwrite each
+    other. A context is also what lets the notice be withdrawn on admission -
+    an appended line could only ever be added to.
+    """
+    job_id = os.environ.get("BUILDKITE_JOB_ID")
+    return f"kueue-waiting-{job_id}" if job_id else None
+
+
+def announce_waiting(context, queue, note):
+    """Say on the build page that this step is queued, not running.
+
+    Buildkite has no state for "the agent has the job but the hardware does
+    not". The step is `running` from the moment the launcher starts, so a build
+    where every TPU step is waiting on one busy reservation looks exactly like
+    a build where every step is executing. The log says which it is, but only
+    if someone opens the job.
+
+    An annotation is the one surface that is visible from the build page
+    without opening anything, and it is withdrawn on admission, so what is left
+    on screen is the set of steps still waiting.
+    """
+    label = os.environ.get("BUILDKITE_LABEL", "this step")
+    agent("annotate", "--context", context, "--style", "info",
+          f":hourglass: **{label}** is waiting for hardware, not running: "
+          f"{note} (queue `{queue}`).")
+
+
+def withdraw_waiting(context):
+    agent("annotation", "remove", "--context", context)
+
+
+def kubectl(*args, check=True, timeout=CLI_TIMEOUT_SECONDS):
+    """Run one kubectl call against the manager.
+
+    Every call here is a single API request, so a deadline costs nothing when
+    the API server is answering and is the difference between a slow poll and
+    a stopped launcher when it is not. The launcher holds an admitted workload
+    for as long as it runs, and a call that never returns holds the chips with
+    it - past the step timeout, since the step is waiting on this process.
+
+    A timeout reads as a failed call rather than an exception for the callers
+    that already tolerate one: a poll that cannot reach the API server has the
+    same nothing to report as a poll that was refused, and the loop's next
+    attempt is a better answer than a traceback.
+    """
+    try:
+        return subprocess.run(
+            ["kubectl", "-n", NAMESPACE, *args],
+            check=check, capture_output=True, text=True, timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        if check:
+            raise
+        return subprocess.CompletedProcess(args, 1, "", f"timed out after {timeout}s")
 
 
 def kubectl_json(*args):
@@ -291,7 +381,7 @@ def pin_digest(image):
     proc = subprocess.run(
         ["gcloud", "artifacts", "docker", "images", "describe", image,
          "--format=value(image_summary.digest)"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, timeout=CLI_TIMEOUT_SECONDS,
     )
     digest = proc.stdout.strip()
     if proc.returncode != 0 or not digest:
@@ -378,34 +468,6 @@ def pod_metadatas(doc):
     ]
 
 
-def secret_env(registry, name):
-    """A value the fleet can supply for a name the step did not set.
-
-    Some names are the fleet's rather than any one pipeline's - the Hugging Face
-    token, without which a gated model cannot be fetched into the shared model
-    cache. Where the secret lives is fleet configuration, in the same tfvars as
-    the quota, so a pipeline should not have to know it or hold a grant on it.
-    The launcher does, and reads it here.
-
-    Only for names a step asked for by --env. Every workload holding the token
-    because the fleet has one would be a different and worse rule.
-    """
-    spec = (registry.get("env_secrets") or {}).get(name)
-    if not spec:
-        return ""
-    proc = subprocess.run(
-        ["gcloud", "secrets", "versions", "access", "latest",
-         f"--secret={spec['secret']}", f"--project={spec['project']}",
-         "--quiet"],
-        capture_output=True, text=True,
-    )
-    if proc.returncode != 0:
-        log(f"warning: could not read {name} from Secret Manager: "
-            f"{proc.stderr.strip().splitlines()[-1:] or ['no output']}")
-        return ""
-    return proc.stdout.strip()
-
-
 def forward_env(doc, names, registry):
     """Copy named step variables onto the workload container.
 
@@ -414,15 +476,34 @@ def forward_env(doc, names, registry):
     that needs its workload to talk back to Buildkite may forward them - but it
     has to say so, one name at a time, so what crosses into a workload pod is
     written down in the step rather than inherited by default.
+
+    Some names are the fleet's rather than any one pipeline's, and the launcher
+    supplies those for a step that asked and does not have one, by pointing at
+    the Secret each worker's sync writes. A reference rather than a value
+    because the pod is on another cluster: a value would be plaintext in the
+    Job, in the Workload Kueue admits it through, in the copies MultiKueue makes
+    of both on the worker, and in the pod - five objects, readable by anything
+    with get on any of them. A secretKeyRef is behind whatever guards the
+    Secret, which is the boundary a credential should have.
     """
-    # Empty counts as unset: a step whose secret lookup came back with nothing
-    # should fall through to the manifest, not overwrite a secretKeyRef with "".
-    values = [
-        (n, os.environ.get(n, "") or secret_env(registry, n)) for n in names
-    ]
-    values = [(n, v) for n, v in values if v != ""]
-    if not values:
+    fleet = registry.get("env_secrets") or {}
+    entries = []
+    for name in names:
+        value = os.environ.get(name, "")
+        if value:
+            entries.append({"name": name, "value": value})
+        elif name in fleet:
+            entries.append({
+                "name": name,
+                "valueFrom": {"secretKeyRef": {
+                    "name": fleet[name]["secret"], "key": fleet[name]["key"],
+                }},
+            })
+        # Anything else falls through to the manifest, which may state a
+        # default; writing "" over it would be worse than not forwarding.
+    if not entries:
         return []
+    named = {e["name"] for e in entries}
     for spec in pod_specs(doc):
         for container in spec.get("containers", []):
             if container.get("name") != WORKLOAD_CONTAINER:
@@ -430,10 +511,13 @@ def forward_env(doc, names, registry):
             env = container.setdefault("env", [])
             # --env wins over the manifest, which holds only the default, so a
             # step can override a cluster secret with one it fetched itself.
-            named = {n for n, _ in values}
             env[:] = [e for e in env if e["name"] not in named]
-            env.extend({"name": n, "value": v} for n, v in values)
-    return [n for n, _ in values]
+            # Copies, so a JobSet's roles do not share one dict between them:
+            # anything that later edits a role's env would be editing every
+            # role's, and finding that out means reading two functions that
+            # look independent.
+            env.extend(copy.deepcopy(e) for e in entries)
+    return [e["name"] for e in entries]
 
 
 # What the built-in Job is rendered with, and the only names a manifest cannot
@@ -758,13 +842,23 @@ def worker_env(cluster_name, registry):
         log(f"no gateway mapping for worker {cluster_name!r}; logs unavailable")
         return None
     env = {**os.environ, "KUBECONFIG": WORKER_KUBECONFIG}
-    proc = subprocess.run(
-        [
-            "gcloud", "container", "fleet", "memberships", "get-credentials",
-            worker["membership"], "--project", worker["project"],
-        ],
-        env=env, capture_output=True, text=True, check=False,
-    )
+    # A timeout is the same answer as a refusal here - no credentials this turn
+    # - and the caller already retries on every poll, so it costs one interval
+    # rather than the run. Without one it costs the run: this is called from
+    # inside the watch loop, with the workload admitted and on the chips.
+    try:
+        proc = subprocess.run(
+            [
+                "gcloud", "container", "fleet", "memberships", "get-credentials",
+                worker["membership"], "--project", worker["project"],
+            ],
+            env=env, capture_output=True, text=True, check=False,
+            timeout=CLI_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired:
+        log(f"gateway credentials timed out for {cluster_name} after "
+            f"{CLI_TIMEOUT_SECONDS}s; retrying on the next poll")
+        return None
     if proc.returncode != 0:
         log(f"gateway credentials failed for {cluster_name}: "
             f"{proc.stderr.strip()[:300]}")
@@ -1025,124 +1119,164 @@ def main():
     subprocess.run(
         ["kubectl", "-n", NAMESPACE, "apply", "-f", "-"],
         input=json.dumps(doc), text=True, check=True,
+        timeout=CLI_TIMEOUT_SECONDS,
     )
 
-    uid = kubectl_json("get", kind, name)["metadata"]["uid"]
-    admission_limit = admission_timeout(registry, doc)
-    started = time.monotonic()
-    admitted = False
-    running = False
-    last_startup = None
-    last_note = None
-    genv = None
-    job_id = labels.get("buildkite.com/job-id")
+    # Everything from here holds an admitted workload, so an exception on the
+    # way out is not just a failed step: the slice keeps running with nobody
+    # watching it. The pod ownerReference does collect it, but only once the
+    # launcher's own pod object is removed, and a pod that exited non-zero
+    # stays until something else cleans it up - minutes to hours during which
+    # the chips are unavailable and the queue behind them does not move.
+    #
+    # Not a `finally`: on the ordinary paths the workload has already reached a
+    # terminal state and the ownerReference is the right thing to remove it,
+    # after Kueue has read the conditions this loop just logged.
+    #
+    # Outside the try because the handler withdraws the notice, and the first
+    # statement inside can raise.
+    waiting = waiting_context()
+    announced = False
 
-    while True:
-        obj = kubectl_json("get", kind, name)
-        if obj is None:
-            log(f"{kind}/{name} disappeared")
-            return 1
+    def stop_announcing():
+        nonlocal announced
+        if announced:
+            announced = False
+            withdraw_waiting(waiting)
 
-        # Watched for the whole run, not just until admission: preemption
-        # happens after it, and a step that goes silent for minutes waiting to
-        # be re-admitted reads as a hang.
-        workload = find_workload(uid)
-        note = describe_admission(workload)
-        cluster = (workload or {}).get("status", {}).get("clusterName")
+    try:
+        uid = kubectl_json("get", kind, name)["metadata"]["uid"]
+        admission_limit = admission_timeout(registry, doc)
+        started = time.monotonic()
+        admitted = False
+        running = False
+        last_startup = None
+        last_note = None
+        genv = None
+        job_id = labels.get("buildkite.com/job-id")
 
-        # On any poll where the cluster is known and we have no credentials,
-        # not only on the first admission: tying the one attempt to that one
-        # moment costs a whole run's logs whenever anything perturbs it, and
-        # reports it as missing gateway access rather than as a failed fetch.
-        if cluster and genv is None:
-            genv = worker_env(cluster, registry)
-            if genv:
-                collector = LogCollector(genv, job_id)
-        if cluster and not admitted:
-            admitted = True
-        if not admitted and time.monotonic() - started > admission_limit:
-            log(f"not admitted within {admission_limit}s - capacity, not the test")
-            delete_workload(kind, name)
-            return 1
-        if note != last_note:
-            log(note)
-            last_note = note
-
-        # One read of the workload's pods, for both readers below.
-        items = worker_pods(genv, job_id) if genv else None
-
-        # Until the first pod is up, say where it is stuck. After that the pod's
-        # own output is the better signal and this goes quiet. A failed read is
-        # neither: leave it to the next turn rather than calling it started.
-        if admitted and items is not None and not running:
-            s = startup_note(genv, items)
-            if s is None:
-                running = True
-            elif s != last_startup:
-                log(s)
-                last_startup = s
-
-        if collector:
-            collector.poll(items)
-
-        # Under MultiKueue the local object is a shadow of one that ran on a
-        # worker, so its own status may never be filled in. The Workload's
-        # Finished condition is authoritative.
-        finished = condition(workload, "Finished")
-        wl_done = bool(finished and finished.get("status") == "True")
-        wl_failed = bool(wl_done and "Failed" in finished.get("reason", ""))
-        wl_succeeded = wl_done and not wl_failed
-
-        if doc["kind"] == "Job":
-            status = obj.get("status", {})
-            done = status.get("succeeded", 0) >= 1 or wl_succeeded
-            failed_cond = condition(obj, "Failed")
-            failed = ((failed_cond and failed_cond.get("status") == "True")
-                      or status.get("failed", 0) >= 1 or wl_failed)
-        else:
-            completed = condition(obj, "Completed")
-            done = bool(completed and completed.get("status") == "True") or wl_succeeded
-            failed_cond = condition(obj, "Failed")
-            failed = bool(failed_cond and failed_cond.get("status") == "True") or wl_failed
-
-        if done or failed:
-            if collector:
-                collector.sweep()     # last look before the pods are removed
-                if not collector.emitted:
-                    log("no workload logs captured: the pods were removed "
-                        "before anything could be read from them.")
-            elif genv is None:
-                log("no workload logs captured: the workload never reported "
-                    "a cluster to fetch gateway credentials for, so none were "
-                    "requested. Not a Connect Gateway permission problem.")
-            if failed and genv:
-                for why in termination_reasons(worker_pods(genv, job_id) or []):
-                    log(f"container terminated: {why}")
-
-            # What the Workload thought, while it still exists - Kueue
-            # collects it soon after the run, and once it is gone a preemption
-            # and a test returning 1 read the same. termination_reasons()
-            # covers the pod that exited; this covers the one taken away.
-            if failed:
-                for c in (workload or {}).get("status", {}).get("conditions", []):
-                    if c.get("status") != "True":
-                        continue
-                    detail = " ".join(x for x in (c.get("reason"),
-                                                  c.get("message")) if x)
-                    log(f"workload {c.get('type')}: {detail}"[:300])
-
-                # Expand the last section: collapsed output keeps a green
-                # build readable, but on a failure it is what anyone wants.
-                print("^^^ +++", flush=True)
-                log(f"{kind}/{name} failed")
+        while True:
+            obj = kubectl_json("get", kind, name)
+            if obj is None:
+                log(f"{kind}/{name} disappeared")
+                stop_announcing()
                 return 1
-            log(f"{kind}/{name} completed")
-            return 0
 
-        if collector and not collector.emitted:
-            time.sleep(FIRST_LOG_POLL_SECONDS)
-        else:
-            time.sleep(POLL_SECONDS)
+            # Watched for the whole run, not just until admission: preemption
+            # happens after it, and a step that goes silent for minutes waiting to
+            # be re-admitted reads as a hang.
+            workload = find_workload(uid)
+            note = describe_admission(workload)
+            cluster = (workload or {}).get("status", {}).get("clusterName")
+
+            # On any poll where the cluster is known and we have no credentials,
+            # not only on the first admission: tying the one attempt to that one
+            # moment costs a whole run's logs whenever anything perturbs it, and
+            # reports it as missing gateway access rather than as a failed fetch.
+            if cluster and genv is None:
+                genv = worker_env(cluster, registry)
+                if genv:
+                    collector = LogCollector(genv, job_id)
+            if cluster and not admitted:
+                admitted = True
+                stop_announcing()
+            if not admitted and time.monotonic() - started > admission_limit:
+                log(f"not admitted within {admission_limit}s - capacity, not the test")
+                stop_announcing()
+                delete_workload(kind, name)
+                return 1
+            if note != last_note:
+                log(note)
+                last_note = note
+                # Only while it is still true. Kueue's reason changes as the
+                # wait goes on - reserved, then preempted, then reserved again -
+                # and the notice is worth keeping current, but it is withdrawn
+                # the moment the workload lands rather than corrected.
+                if waiting and not admitted:
+                    announce_waiting(waiting, profile["queue"], note)
+                    announced = True
+
+            # One read of the workload's pods, for both readers below.
+            items = worker_pods(genv, job_id) if genv else None
+
+            # Until the first pod is up, say where it is stuck. After that the pod's
+            # own output is the better signal and this goes quiet. A failed read is
+            # neither: leave it to the next turn rather than calling it started.
+            if admitted and items is not None and not running:
+                s = startup_note(genv, items)
+                if s is None:
+                    running = True
+                elif s != last_startup:
+                    log(s)
+                    last_startup = s
+
+            if collector:
+                collector.poll(items)
+
+            # Under MultiKueue the local object is a shadow of one that ran on a
+            # worker, so its own status may never be filled in. The Workload's
+            # Finished condition is authoritative.
+            finished = condition(workload, "Finished")
+            wl_done = bool(finished and finished.get("status") == "True")
+            wl_failed = bool(wl_done and "Failed" in finished.get("reason", ""))
+            wl_succeeded = wl_done and not wl_failed
+
+            if doc["kind"] == "Job":
+                status = obj.get("status", {})
+                done = status.get("succeeded", 0) >= 1 or wl_succeeded
+                failed_cond = condition(obj, "Failed")
+                failed = ((failed_cond and failed_cond.get("status") == "True")
+                          or status.get("failed", 0) >= 1 or wl_failed)
+            else:
+                completed = condition(obj, "Completed")
+                done = bool(completed and completed.get("status") == "True") or wl_succeeded
+                failed_cond = condition(obj, "Failed")
+                failed = bool(failed_cond and failed_cond.get("status") == "True") or wl_failed
+
+            if done or failed:
+                if collector:
+                    collector.sweep()     # last look before the pods are removed
+                    if not collector.emitted:
+                        log("no workload logs captured: the pods were removed "
+                            "before anything could be read from them.")
+                elif genv is None:
+                    log("no workload logs captured: the workload never reported "
+                        "a cluster to fetch gateway credentials for, so none were "
+                        "requested. Not a Connect Gateway permission problem.")
+                if failed and genv:
+                    for why in termination_reasons(worker_pods(genv, job_id) or []):
+                        log(f"container terminated: {why}")
+
+                # What the Workload thought, while it still exists - Kueue
+                # collects it soon after the run, and once it is gone a preemption
+                # and a test returning 1 read the same. termination_reasons()
+                # covers the pod that exited; this covers the one taken away.
+                if failed:
+                    for c in (workload or {}).get("status", {}).get("conditions", []):
+                        if c.get("status") != "True":
+                            continue
+                        detail = " ".join(x for x in (c.get("reason"),
+                                                      c.get("message")) if x)
+                        log(f"workload {c.get('type')}: {detail}"[:300])
+
+                    # Expand the last section: collapsed output keeps a green
+                    # build readable, but on a failure it is what anyone wants.
+                    print("^^^ +++", flush=True)
+                    log(f"{kind}/{name} failed")
+                    return 1
+                log(f"{kind}/{name} completed")
+                return 0
+
+            if collector and not collector.emitted:
+                time.sleep(FIRST_LOG_POLL_SECONDS)
+            else:
+                time.sleep(POLL_SECONDS)
+    except BaseException:
+        stop_announcing()
+        if not deleted:
+            deleted = True
+            delete_workload(kind, name)
+        raise
 
 
 if __name__ == "__main__":

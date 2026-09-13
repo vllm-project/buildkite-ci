@@ -67,6 +67,31 @@ resource "google_container_cluster" "worker" {
     }
   }
 
+  # What puts a fleet credential within reach of a workload pod, the same pair
+  # of addons the manager runs. A pod here is on another cluster from the
+  # launcher that submitted it, so a value the launcher resolved would have to
+  # travel as plaintext in the podspec - readable by anything that can get jobs
+  # in the namespace, and copied again into the Kueue Workload. A secretKeyRef
+  # instead needs the Secret to exist here, which is what the sync does.
+  #
+  # Five minutes because that is the manager's, and a rotation the two clusters
+  # notice at different times is a difference nobody would think to look for.
+  secret_manager_config {
+    enabled = true
+    rotation_config {
+      enabled           = true
+      rotation_interval = "300s"
+    }
+  }
+
+  secret_sync_config {
+    enabled = true
+    rotation_config {
+      enabled           = true
+      rotation_interval = "300s"
+    }
+  }
+
   # MultiKueue reaches workers through the Connect Gateway, which resolves a
   # Fleet membership rather than a kubeconfig. Registering here is enough: GKE
   # creates the membership itself, in the cluster's region, and ties its
@@ -91,10 +116,8 @@ resource "google_container_cluster" "worker" {
 
   lifecycle {
     ignore_changes = [
-      # GKE turns these on by itself and reports them back, so they diff on
-      # every plan if tracked.
-      secret_manager_config,
-      secret_sync_config,
+      # GKE turns this on by itself and reports it back, so it diffs on every
+      # plan if tracked.
       monitoring_config,
     ]
   }
@@ -228,6 +251,12 @@ resource "google_container_node_pool" "worker_tpu" {
 
     # A test image here is tens of gigabytes and a pod reads part of it, so
     # starting before the pull finishes is most of the cold start.
+    #
+    # Streaming serves an image GKE has converted, and it converts each digest
+    # once: the first node to want a freshly pushed image waits out the
+    # conversion and every node after it mounts in seconds. So a slow first
+    # pull is not streaming failing to engage, and caching layers on the node
+    # would not shorten it - the digest is new every build.
     gcfs_config {
       enabled = true
     }

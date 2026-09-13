@@ -923,7 +923,7 @@
       "causal_confirmation": {
         "kind": "code_analysis",
         "reference_url": "https://github.com/vllm-project/vllm/pull/56323",
-        "notes": "The preceding selected main completed the exact lane in 41m05s; after the culprit registered four native sampler warmups per engine, two consecutive main builds timed out while another engine was compiling without a failed test."
+        "notes": "The preceding selected main completed the exact lane in 41m05s; after the culprit registered four native sampler warmups per engine, two consecutive main builds timed out while another engine was compiling without a failed test. The only unchanged retry of build 88593 repeated the 60-minute timeout on h200-ci-4 after 32 completed warmups totaling 897.12 seconds, with 721 passing tests and no test failure."
       }
     },
     {

@@ -17,7 +17,21 @@ spec:
   # a pod the infrastructure took away (node lost, autoscaler) is replaced for
   # as long as activeDeadlineSeconds allows: DisruptionTarget is ignored, and
   # only the workload container's own exit code fails the Job.
-  backoffLimit: 0
+  #
+  # The limit is what carries the second half of that, not the rules. A test
+  # that fails is failed by the FailJob rule below, which ends the Job on the
+  # spot no matter how many retries remain, so this number never lets a red
+  # test run twice. What it covers is the case neither rule names: a TPU node
+  # repaired underneath a running pod rejects it at kubelet admission -
+  # `no healthy devices present; cannot allocate unhealthy devices
+  # google.com/tpu` - and that pod has no DisruptionTarget condition and no
+  # container exit code, because the container never started. At zero, the
+  # step's result is whatever the hardware did.
+  #
+  # Three, rather than a number that spends the whole deadline: a node repair
+  # is a single event and one replacement clears it, while a pool that cannot
+  # produce a healthy node should say so in the time a person is waiting.
+  backoffLimit: 3
   podFailurePolicy:
     rules:
       - action: Ignore

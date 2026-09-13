@@ -1058,12 +1058,12 @@
         "build_number": 88593,
         "job_id": "01a098cf-26d3-4fbd-9701-7b2da1e36bcf",
         "url": "https://buildkite.com/vllm/ci/builds/88593#01a098cf-26d3-4fbd-9701-7b2da1e36bcf",
-        "signature": "the lane timed out after 16 sampler JIT warmups added 1083 seconds while 15 of 17 example commands completed"
+        "signature": "the lane timed out after 16 sampler JIT warmups added 1083 seconds while 15 of 17 example commands completed, and its only unchanged retry repeated"
       },
       "causal_confirmation": {
         "kind": "code_analysis",
         "reference_url": "https://github.com/vllm-project/vllm/pull/56323",
-        "notes": "The preceding full main completed the exact lane in 27m17s. After PR #56323 registered about 120 sampler keys per engine, the job exceeded its 40-minute budget without a failed command; exact rollback coverage is pending."
+        "notes": "The preceding full main completed the exact lane in 27m17s. After PR #56323 registered about 120 sampler keys per engine, both attempts exceeded the 40-minute budget without a failed command; the retry logged 16 warmups totaling 1068 seconds. Exact rollback coverage is pending."
       }
     },
     {

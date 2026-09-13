@@ -1121,6 +1121,90 @@
         "reference_url": "https://github.com/vllm-project/vllm/pull/56323",
         "notes": "The preceding full main completed the exact lane in 42m32s. After PR #56323 registered sampler kernels across parallel workers, both attempts exceeded the 55-minute budget after 31 passing tests; the retry logged the same 78 warmups totaling 1188 seconds. Exact rollback coverage is pending."
       }
+    },
+    {
+      "id": "pr-56323-main-88612-arm-cpu-shard-2",
+      "job_name": "Arm CPU Test Shard 2",
+      "job_key": "arm-cpu-test",
+      "culprit_pr": {
+        "number": 56323,
+        "url": "https://github.com/vllm-project/vllm/pull/56323",
+        "merge_commit": "aed894c190aa3db74c502d521b3bc3935ad85de1"
+      },
+      "pr_ci": {
+        "ran": false,
+        "state": "not_selected",
+        "build_number": 88574,
+        "job_id": null,
+        "url": "https://buildkite.com/vllm/ci/builds/88574"
+      },
+      "main_failure": {
+        "build_number": 88612,
+        "job_id": "01a0995b-7d09-414a-9448-99777c1de60e",
+        "url": "https://buildkite.com/vllm/ci/builds/88612#01a0995b-7d09-414a-9448-99777c1de60e",
+        "signature": "Arm CPU engine startup failed at import time because the warmup decorator dereferenced triton.runtime on the runtime-less Triton placeholder"
+      },
+      "causal_confirmation": {
+        "kind": "code_analysis",
+        "reference_url": "https://github.com/vllm-project/vllm/pull/56676",
+        "notes": "The preceding daily build passed the exact shard. PR #56323 added the module-level spec-decode warmup decorator, but its PR build did not select any Arm CPU shard; the partial warmup rollback left this decorator in place. Draft PR #56676 adds the missing HAS_TRITON guard and a runtime-less placeholder regression test."
+      }
+    },
+    {
+      "id": "pr-56323-main-88612-arm-cpu-shard-3",
+      "job_name": "Arm CPU Test Shard 3",
+      "job_key": "arm-cpu-test",
+      "culprit_pr": {
+        "number": 56323,
+        "url": "https://github.com/vllm-project/vllm/pull/56323",
+        "merge_commit": "aed894c190aa3db74c502d521b3bc3935ad85de1"
+      },
+      "pr_ci": {
+        "ran": false,
+        "state": "not_selected",
+        "build_number": 88574,
+        "job_id": null,
+        "url": "https://buildkite.com/vllm/ci/builds/88574"
+      },
+      "main_failure": {
+        "build_number": 88612,
+        "job_id": "01a0995b-7d0a-44d9-831b-87282c91863a",
+        "url": "https://buildkite.com/vllm/ci/builds/88612#01a0995b-7d0a-44d9-831b-87282c91863a",
+        "signature": "Arm CPU serving startup failed at import time because the warmup decorator dereferenced triton.runtime on the runtime-less Triton placeholder"
+      },
+      "causal_confirmation": {
+        "kind": "code_analysis",
+        "reference_url": "https://github.com/vllm-project/vllm/pull/56676",
+        "notes": "The preceding daily build passed the exact shard. This independent shard reproduced the same deterministic import path from PR #56323, whose PR build selected no Arm CPU shard; draft PR #56676 guards autotune inspection when Triton is disabled."
+      }
+    },
+    {
+      "id": "pr-56157-main-88612-b200-lm-eval-pcp",
+      "job_name": "B200 LM Eval PCP",
+      "job_key": "lm-eval-pcp-4xb200",
+      "culprit_pr": {
+        "number": 56157,
+        "url": "https://github.com/vllm-project/vllm/pull/56157",
+        "merge_commit": "ebe1dec2da16ac559e40446a4c6e06a73c9efe00"
+      },
+      "pr_ci": {
+        "ran": false,
+        "state": "blocked",
+        "build_number": 88566,
+        "job_id": "01a09775-8294-4650-847c-daf7c477f5f1",
+        "url": "https://buildkite.com/vllm/ci/builds/88566#01a09775-8294-4650-847c-daf7c477f5f1"
+      },
+      "main_failure": {
+        "build_number": 88612,
+        "job_id": "01a0995b-7d98-4db4-8647-8bcabd2a7ab1",
+        "url": "https://buildkite.com/vllm/ci/builds/88612#01a0995b-7d98-4db4-8647-8bcabd2a7ab1",
+        "signature": "the new GLM-5.2 PCP4+DCP4 evaluation failed every worker at startup because it defaulted to the unsupported a2a DCP backend"
+      },
+      "causal_confirmation": {
+        "kind": "code_analysis",
+        "reference_url": "https://github.com/vllm-project/vllm/pull/56677",
+        "notes": "PR #56157 both added the PCP4+DCP4 config without a DCP backend flag and added validation requiring ag_rs, while its exact optional B200 evaluation stayed blocked in PR CI. Draft PR #56677 supplies the single missing --dcp-comm-backend ag_rs argument."
+      }
     }
   ]
 }
